@@ -68,7 +68,7 @@ async function callModel(model, transcript, draft) {
     const data = await response.json();
     const raw = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('');
     if (!raw) throw new Error('Model returned an empty response');
-    return parseOutput(raw, gemma);
+    return parseModelOutput(raw, model);
   } finally { clearTimeout(timeout); }
 }
 
