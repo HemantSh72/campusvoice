@@ -44,9 +44,7 @@ const STATUS_PATTERNS = [
 ];
 
 // Cancel patterns
-const CANCEL_PATTERNS = [
-  /\b(?:cancel|stop|abort|quit|exit|never\s+mind|nevermind|forget\s+it)\b/i,
-];
+const CANCEL_PATTERNS = [\n  /^\\s*(?:cancel(?:\\s+(?:this|that|it))?|stop\\s+(?:this|that|the complaint)|abort|quit|exit|never\\s+mind|nevermind|forget\\s+it)\\s*[.!]*$/i,\n];
 
 // Spelled-out numbers one..twenty
 const SPELLED_NUMBERS = {
@@ -204,6 +202,8 @@ export function parse(text, draft = {}) {
   const category = detectCategory(cleanText);
   const priority = detectPriority(cleanText);
   const location = extractLocation(cleanText);
+  const hasIssueSignal = category !== 'other' || /\\b(?:issue|problem|broken|not working|doesn't work|does not work|stopped working|damaged|missing|dirty|unsafe|leaking|leak|blocked|delay|late|complaint|complain|no water|no power|wifi down|internet down|bad quality|not available)\\b/i.test(cleanText);
+  if (!hasIssueSignal) return { intent: 'unknown', draft: {}, ticketNumber: null, awaiting: false };
 
   // Build a clean summary (use the raw text, truncated)
   const summary = cleanText.length > 200 ? cleanText.slice(0, 197) + '...' : cleanText;
