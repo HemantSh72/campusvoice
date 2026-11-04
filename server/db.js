@@ -50,6 +50,15 @@ async function listIndexesSafe(collection) {
 async function ensureIndexes(db) {
   if (!indexesPromise) {
     indexesPromise = (async () => {
+      // listIndexes fails for a collection that has not been created yet.
+      // Create these two collections safely before inspecting legacy indexes.
+      for (const name of ['tickets', 'rateLimits']) {
+        const exists = await db.listCollections({ name }, { nameOnly: true }).hasNext();
+        if (!exists) {
+          try { await db.createCollection(name); }
+          catch (error) { if (error.code !== 48) throw error; }
+        }
+      }
       const tickets = db.collection('tickets');
       // Missing fields are excluded by the sparse unique index; legacy nulls are not.
       await tickets.updateMany({ requestId: null }, { $unset: { requestId: '' } });
