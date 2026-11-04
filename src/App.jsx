@@ -12,7 +12,7 @@ const FRIENDLY_SPEECH_ERRORS = {
   'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings, or type your complaint below.',
   'service-not-allowed': 'This browser does not allow speech recognition here. You can type your complaint below.',
   'no-speech': 'I did not hear anything. Please try speaking again, or type your complaint.',
-  'audio-capture': 'I could not find an available microphone. Check your microphone connection or type your complaint.',
+  'audio-capture': 'No microphone is available to CampusVoice. Connect or select a microphone in your browser settings, then try again. You can type your complaint below.',
   network: 'Speech recognition could not connect. Check your internet connection or type your complaint.',
   aborted: 'Voice input was stopped.',
   'start-failed': 'I could not start the microphone. Check browser permissions or type your complaint.',
@@ -118,8 +118,7 @@ export default function App() {
     if (!speech.error || speech.error === 'aborted') return;
     const friendly = FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed. Please try again or type your complaint.';
     setReply(friendly);
-    speak(friendly, 'en-IN');
-  }, [speech.error, speak]);
+  }, [speech.error]);
 
   const startListening = () => {
     if (busy || ttsSpeaking) return;
