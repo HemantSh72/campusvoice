@@ -167,7 +167,7 @@ export function parse(text, draft = {}) {
     const resolvedLocation = extractedLocation || fallbackLocation;
 
     // A location is valid if it's at least 3 chars and not just 'hmm', 'ok', etc.
-    const meaningless = /^(hmm+|ok|okay|um+|uh+|yes|no|idk|dunno|i don'?t know)$/i;
+    const meaningless = /^(hmm+|ok|okay|um+|uh+|yes|no|idk|dunno|i don'?t know(?: where)?|i do not know(?: where)?)$/i;
     const isValidLocation = resolvedLocation && resolvedLocation.length >= 3 && !meaningless.test(resolvedLocation.trim());
 
     if (isValidLocation) {
