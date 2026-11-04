@@ -1,65 +1,47 @@
 /**
- * server/config.js
- * Central config object — reads env vars, provides typed defaults.
- * All env vars are optional locally. This module never throws.
+ * Central environment configuration. .env.local is loaded only for local use.
  */
-
-// Load .env.local in development (Vite handles this for the frontend;
-// we do it manually for the Express server process).
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 function loadDotEnvLocal() {
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') return;
   try {
-    const filePath = resolve(process.cwd(), '.env.local');
-    const lines = readFileSync(filePath, 'utf8').split('\n');
-    for (const line of lines) {
+    for (const line of readFileSync(resolve(process.cwd(), '.env.local'), 'utf8').split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx < 0) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      const val = trimmed.slice(eqIdx + 1).trim();
-      // Don't overwrite vars already set in the process environment
-      if (key && !(key in process.env)) {
-        process.env[key] = val;
-      }
+      const index = trimmed.indexOf('=');
+      if (index < 1) continue;
+      const key = trimmed.slice(0, index).trim();
+      const value = trimmed.slice(index + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
+      if (key && !(key in process.env)) process.env[key] = value;
     }
-  } catch {
-    // .env.local is optional
-  }
+  } catch { /* optional */ }
 }
-
 loadDotEnvLocal();
 
-const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+const int = (value, fallback, min = 0) => {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback;
+};
+const modelChain = (process.env.GEMINI_MODEL_CHAIN || 'gemini-3.1-flash-lite,gemini-3.5-flash-lite')
+  .split(',').map((value) => value.trim()).filter(Boolean);
 
 const config = Object.freeze({
-  isProduction,
-
-  // LLM
+  isProduction: process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL),
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
-  geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash',
-  llmDailyBudget: parseInt(process.env.LLM_DAILY_BUDGET || '150', 10),
-
-  // Database
+  geminiModelChain: [...new Set(modelChain)],
+  gemmaModel: process.env.GEMMA_MODEL?.trim() || '',
+  llmDailyCapPerModel: int(process.env.LLM_DAILY_CAP_PER_MODEL, 450, 1),
+  gemmaDailyCap: int(process.env.GEMMA_DAILY_CAP_PER_MODEL, 5000, 1),
   mongoUri: process.env.MONGODB_URI || '',
   mongoDb: process.env.MONGODB_DB || 'campusvoice',
-
-  // Telegram
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
-
-  // Admin
   adminPin: process.env.ADMIN_PIN || '',
-
-  // Rate limiting
-  rateLimitPerMin: parseInt(process.env.RATE_LIMIT_PER_MIN || '40', 10),
-  rateLimitPerDay: parseInt(process.env.RATE_LIMIT_PER_DAY || '1000', 10),
-
-  // Server
-  port: parseInt(process.env.PORT || '5000', 10),
+  rateLimitPerMin: int(process.env.RATE_LIMIT_PER_MIN, 40, 1),
+  rateLimitPerDay: int(process.env.RATE_LIMIT_PER_DAY, 1000, 1),
+  port: int(process.env.PORT, 5000, 1),
+  telegramChannelUrl: process.env.VITE_TELEGRAM_CHANNEL_URL || '',
 });
-
 export default config;
