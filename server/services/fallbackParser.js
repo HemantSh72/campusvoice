@@ -45,7 +45,7 @@ const STATUS_PATTERNS = [
 
 // Cancel patterns
 const CANCEL_PATTERNS = [
-  /^\s*(?:cancel(?:\s+(?:this|that|it))?|stop\s+(?:this|that|the complaint)|abort|quit|exit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i,
+  /^\s*(?:cancel(?:\s+(?:this|that|it|the complaint))?|stop(?:\s+(?:this|that|the complaint))?|abort|quit|exit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i,
 ];
 
 // Spelled-out numbers one..twenty
