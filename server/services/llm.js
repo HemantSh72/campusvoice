@@ -38,6 +38,10 @@ export function parseModelOutput(raw, model = '') {
   return { intent: normalized.intent, draft, ticketNumber: Number.isSafeInteger(number) && number > 0 ? number : null };
 }
 
+export function parseOutput(raw, gemma = false) {
+  return parseModelOutput(raw, gemma ? 'gemma' : 'gemini');
+}
+
 function isStatusOrCancel(text) {
   return /^\s*(?:cancel|stop|abort|quit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i.test(text) ||
     /\b(?:status|track|check)\b.*\bticket\b/i.test(text) ||
