@@ -69,8 +69,9 @@ async function callModel(model, transcript, draft) {
 }
 
 const statusOrCancel = (text) =>
-  /\b(cancel|stop|abort|quit|never mind|nevermind)\b/i.test(text) ||
-  /\b(status|track|check|ticket|complaint)\b/i.test(text);
+  /^\s*(?:cancel(?:\s+(?:this|that|it))?|stop\s+(?:this|that|the complaint)|abort|quit|never mind|nevermind|forget it)\s*[.!]*$/i.test(text) ||
+  /\b(?:status|track|check)\b.*\bticket\b/i.test(text) ||
+  /\bticket\s+(?:number\s+)?\d+\b/i.test(text);
 
 export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
   if (draft.summary && !draft.location && transcript.trim().split(/\s+/).length <= 8 && !statusOrCancel(transcript)) {
@@ -89,14 +90,18 @@ export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
       if (await modelIsBlocked(model)) continue;
       if (!(await reserveModelCall(model, cap))) continue;
       let parsed;
-      try { parsed = await callModel(model, transcript, draft); }
-      catch (error) {
+      try {
+        parsed = await callModel(model, transcript, draft);
+      } catch (error) {
         if (error.quota || error.status === 429) {
           await recordModelQuotaFailure(model);
           continue;
         }
-        if (error.status >= 500 && error.status < 600) parsed = await callModel(model, transcript, draft);
-        else throw error;
+        if (error.status >= 500 && error.status < 600) {
+          // Count the retry as a second API call against the same model cap.
+          if (!(await reserveModelCall(model, cap))) continue;
+          parsed = await callModel(model, transcript, draft);
+        } else throw error;
       }
       if (parsed.intent === 'report_issue' && parsed.draft.summary && !parsed.draft.location) {
         return { ...parsed, parsedBy: 'gemini', awaiting: true, reply: 'Where is this happening? Please tell me the block or area.' };
