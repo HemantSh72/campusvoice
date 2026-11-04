@@ -29,7 +29,7 @@ export function parseModelOutput(raw, model = '') {
       const char = raw[index];
       if (inString) {
         if (escaped) escaped = false;
-        else if (char === '\\\\') escaped = true;
+        else if (char === '\\') escaped = true;
         else if (char === '"') inString = false;
       } else if (char === '"') inString = true;
       else if (char === '{') depth += 1;
