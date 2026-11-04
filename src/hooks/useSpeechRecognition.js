@@ -60,9 +60,11 @@ export function useSpeechRecognition() {
       setInterimTranscript('');
     };
     recognition.onend = () => {
-      setListening(false);
-      setInterimTranscript('');
-      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null;
+        setListening(false);
+        setInterimTranscript('');
+      }
     };
     try { recognition.start(); return true; }
     catch { setError('start-failed'); setListening(false); recognitionRef.current = null; return false; }
