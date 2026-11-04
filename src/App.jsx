@@ -190,14 +190,32 @@ export default function App() {
   const telegramUrl = import.meta.env.VITE_TELEGRAM_CHANNEL_URL;
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>CampusVoice</h1>
-        <p>Your campus grievance desk. Speak naturally — we’ll route the issue.</p>
-      </header>
-
-      <main className="app-main">
-        <section className="card" aria-label="System status">
+    <div className="app dashboard-app">
+      <aside className="sidebar" aria-label="Main navigation">
+        <a className="sidebar-brand" href="#workspace" aria-label="CampusVoice home">
+          <span className="brand-mark">CV</span>
+          <span><strong>CampusVoice</strong><small>Grievance desk</small></span>
+        </a>
+        <nav className="sidebar-nav">
+          <p className="sidebar-label">WORKSPACE</p>
+          <a className="sidebar-link active" href="#ticket-dashboard"><span className="nav-icon">▦</span><span>All tickets</span><b>{tickets.length}</b></a>
+          <a className="sidebar-link" href="#voice-panel"><span className="nav-icon">＋</span><span>New grievance</span></a>
+          <a className="sidebar-link" href="#system-status"><span className="nav-icon">◉</span><span>System status</span></a>
+        </nav>
+        <div className="sidebar-spacer" />
+        <div className="sidebar-status"><span className="live-indicator" />Live service status<strong>{health?.db === 'mongo' ? 'Connected' : health?.db || 'Checking'}</strong></div>
+      </aside>
+      <div className="app-center" id="workspace">
+        <header className="app-header">
+          <div>
+            <p className="workspace-kicker">CAMPUSVOICE / SUPPORT WORKSPACE</p>
+            <h1>Grievance desk</h1>
+            <p>Review campus issues and submit a new report.</p>
+          </div>
+          <span className="workspace-pill"><span className="live-indicator" />Support desk</span>
+        </header>
+        <main className="app-main">
+        <section className="card" aria-label="System status" id="system-status">
           <h2 className="card-title">System status</h2>
           <div className="status-strip" aria-live="polite">
             <span className={'status-badge ' + statusClass(speech.supported ? 'supported' : 'unsupported')}>
@@ -217,75 +235,7 @@ export default function App() {
             <p className="muted-small mt-1">Model chain: {health.modelChain.map((model) => model.model + ' (' + model.status + ')').join(' → ')}</p>
           )}
         </section>
-
-        <section className="card mic-section" aria-label="Voice complaint">
-          <div className="lang-toggle" aria-label="Speech language">
-            <span>Speak in</span>
-            <button className={lang === 'en-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('en-IN')} type="button">English</button>
-            <button className={lang === 'hi-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('hi-IN')} type="button">हिन्दी</button>
-          </div>
-          <div className="mic-button-wrap">
-            <div className={'mic-ring ' + (speech.listening ? 'listening' : ttsSpeaking ? 'speaking' : '')} />
-            <button
-              className={'mic-button ' + (apiError || speech.error ? 'error' : speech.listening ? 'listening' : busy ? 'thinking' : ttsSpeaking ? 'speaking' : 'idle')}
-              type="button"
-              onClick={speech.listening ? speech.stop : startListening}
-              disabled={busy || ttsSpeaking || (!speech.supported && !speech.listening)}
-              aria-label={speech.listening ? 'Stop listening' : 'Start voice input'}
-            >{speech.listening ? '■' : busy ? '…' : ttsSpeaking ? '🔊' : '🎙️'}</button>
-          </div>
-          <p className="mic-state-label" aria-live="polite">
-            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : speech.error ? 'Microphone error — see guidance below' : 'Ready when you are'}
-          </p>
-          {(speech.listening || ttsSpeaking) && (
-            <button className="stop-button" type="button" onClick={() => { stopRequested.current = true; speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
-          )}
-          {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
-          {!ttsSupported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
-          {speech.error && speech.error !== 'aborted' && <div className="warning-banner" role="status">{FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed.'}</div>}
-          <div className="transcript-display" aria-live="polite">
-            {message && <p className="transcript-final">You said: {message}</p>}
-            {speech.interimTranscript && <p className="transcript-interim">{speech.interimTranscript}</p>}
-          </div>
-          {awaiting && <p className="warning-banner">One more detail needed: {draft.summary ? 'tell me the location.' : 'describe the campus issue.'} The microphone will listen again after this question.</p>}
-        </section>
-
-        <section className="card">
-          <h2 className="card-title">Assistant</h2>
-          <div className="reply-bubble" aria-live="polite"><span className="reply-icon">💬</span><p>{reply}</p></div>
-          {lastTicket && (
-            <div className="draft-card mt-2">
-              <div className="draft-field"><label>Ticket</label><value>#{lastTicket.ticketNumber}</value></div>
-              <div className="draft-field"><label>Status</label><value>{lastTicket.status || 'open'}</value></div>
-              <div className="draft-field"><label>Department</label><value>{lastTicket.department}</value></div>
-              <div className="draft-field"><label>Priority / SLA</label><value>{lastTicket.priority} · {lastTicket.slaHours}h</value></div>
-              <div className="draft-field"><label>Location</label><value>{lastTicket.location}</value></div>
-              <div className="draft-field"><label>Telegram</label><value>{lastTicket.telegramStatus}</value></div>
-            </div>
-          )}
-          {draft.summary && awaiting && (
-            <div className="draft-card mt-2">
-              <div className="draft-field"><label>Draft summary</label><value>{draft.summary}</value></div>
-              <div className="draft-field"><label>Location</label><value>{draft.location || 'Waiting for location'}</value></div>
-            </div>
-          )}
-        </section>
-
-        <section className="card">
-          <h2 className="card-title">Or type your message</h2>
-          <form className="typed-input-wrap" onSubmit={submitTyped}>
-            <input className="typed-input" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder="e.g. WiFi is down in block A…" aria-label="Type a complaint or ticket status query" />
-            <button className="send-btn" type="submit" disabled={!typed.trim() || busy}>Send</button>
-          </form>
-          <p className="muted-small mt-1">Try saying — tap an example to submit it as text:</p>
-          <div className="chips-wrap mt-1">
-            {EXAMPLES.map((example) => <button className="chip" type="button" key={example} disabled={busy} onClick={() => submitTranscript(example)}>{example}</button>)}
-          </div>
-          {apiError && <div className="error-banner mt-2" role="alert">{apiError}</div>}
-          {failedTranscript && <button className="send-btn mt-2" type="button" onClick={() => submitTranscript(failedTranscript)} disabled={busy}>Retry same request</button>}
-        </section>
-
-        <section className="card">
+        <section className="card" id="ticket-dashboard">
           <div className="dashboard-header">
             <div><h2 className="card-title">Live ticket dashboard</h2><p className="muted-small">Latest 30 tickets · refreshes every 5 seconds</p></div>
             <div className="dashboard-actions">
@@ -316,10 +266,79 @@ export default function App() {
             ))}
           </div>
         </section>
-      </main>
+        </main>
       <footer className="app-footer">
         Speech recognition and speech output run in your browser. Tickets are stored in the configured database; local development without MongoDB uses temporary memory only. Gemini and Telegram are real integrations only when configured. This demo is not an emergency service.
       </footer>
+    </div>
+      </div>
+      <aside className="detail-panel" aria-label="Create and respond to grievances">
+        <div className="panel-heading"><p className="workspace-kicker">QUICK ACTION</p><h2>Report an issue</h2></div>
+        <section className="card mic-section" aria-label="Voice complaint" id="voice-panel">
+          <div className="lang-toggle" aria-label="Speech language">
+            <span>Speak in</span>
+            <button className={lang === 'en-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('en-IN')} type="button">English</button>
+            <button className={lang === 'hi-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('hi-IN')} type="button">हिन्दी</button>
+          </div>
+          <div className="mic-button-wrap">
+            <div className={'mic-ring ' + (speech.listening ? 'listening' : ttsSpeaking ? 'speaking' : '')} />
+            <button
+              className={'mic-button ' + (apiError || speech.error ? 'error' : speech.listening ? 'listening' : busy ? 'thinking' : ttsSpeaking ? 'speaking' : 'idle')}
+              type="button"
+              onClick={speech.listening ? speech.stop : startListening}
+              disabled={busy || ttsSpeaking || (!speech.supported && !speech.listening)}
+              aria-label={speech.listening ? 'Stop listening' : 'Start voice input'}
+            >{speech.listening ? '■' : busy ? '…' : ttsSpeaking ? '🔊' : '🎙️'}</button>
+          </div>
+          <p className="mic-state-label" aria-live="polite">
+            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : speech.error ? 'Microphone error — see guidance below' : 'Ready when you are'}
+          </p>
+          {(speech.listening || ttsSpeaking) && (
+            <button className="stop-button" type="button" onClick={() => { stopRequested.current = true; speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
+          )}
+          {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
+          {!ttsSupported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
+          {speech.error && speech.error !== 'aborted' && <div className="warning-banner" role="status">{FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed.'}</div>}
+          <div className="transcript-display" aria-live="polite">
+            {message && <p className="transcript-final">You said: {message}</p>}
+            {speech.interimTranscript && <p className="transcript-interim">{speech.interimTranscript}</p>}
+          </div>
+          {awaiting && <p className="warning-banner">One more detail needed: {draft.summary ? 'tell me the location.' : 'describe the campus issue.'} The microphone will listen again after this question.</p>}
+        </section>
+        <section className="card">
+          <h2 className="card-title">Or type your message</h2>
+          <form className="typed-input-wrap" onSubmit={submitTyped}>
+            <input className="typed-input" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder="e.g. WiFi is down in block A…" aria-label="Type a complaint or ticket status query" />
+            <button className="send-btn" type="submit" disabled={!typed.trim() || busy}>Send</button>
+          </form>
+          <p className="muted-small mt-1">Try saying — tap an example to submit it as text:</p>
+          <div className="chips-wrap mt-1">
+            {EXAMPLES.map((example) => <button className="chip" type="button" key={example} disabled={busy} onClick={() => submitTranscript(example)}>{example}</button>)}
+          </div>
+          {apiError && <div className="error-banner mt-2" role="alert">{apiError}</div>}
+          {failedTranscript && <button className="send-btn mt-2" type="button" onClick={() => submitTranscript(failedTranscript)} disabled={busy}>Retry same request</button>}
+        </section>
+        <section className="card">
+          <h2 className="card-title">Assistant</h2>
+          <div className="reply-bubble" aria-live="polite"><span className="reply-icon">💬</span><p>{reply}</p></div>
+          {lastTicket && (
+            <div className="draft-card mt-2">
+              <div className="draft-field"><label>Ticket</label><value>#{lastTicket.ticketNumber}</value></div>
+              <div className="draft-field"><label>Status</label><value>{lastTicket.status || 'open'}</value></div>
+              <div className="draft-field"><label>Department</label><value>{lastTicket.department}</value></div>
+              <div className="draft-field"><label>Priority / SLA</label><value>{lastTicket.priority} · {lastTicket.slaHours}h</value></div>
+              <div className="draft-field"><label>Location</label><value>{lastTicket.location}</value></div>
+              <div className="draft-field"><label>Telegram</label><value>{lastTicket.telegramStatus}</value></div>
+            </div>
+          )}
+          {draft.summary && awaiting && (
+            <div className="draft-card mt-2">
+              <div className="draft-field"><label>Draft summary</label><value>{draft.summary}</value></div>
+              <div className="draft-field"><label>Location</label><value>{draft.location || 'Waiting for location'}</value></div>
+            </div>
+          )}
+        </section>
+      </aside>
     </div>
   );
 }
