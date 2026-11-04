@@ -58,8 +58,10 @@ export async function createTicket(data) {
     return { ticket, isDuplicate: false };
   } catch (error) {
     if (error.code === 11000 && requestId) {
-      const existing = await findByRequestId({ db, mem }, requestId);
-      if (existing) return { ticket: existing, isDuplicate: true };
+      if (requestId) {
+        const existing = await findByRequestId({ db, mem }, requestId);
+        if (existing) return { ticket: existing, isDuplicate: true };
+      }
     }
     throw error;
   }
