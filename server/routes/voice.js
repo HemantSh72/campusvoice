@@ -58,11 +58,14 @@ router.post('/', async (req, res) => {
       draft: nextDraft, awaiting: true, parsedBy: parsed.parsedBy,
     });
 
-    if (parsed.awaiting || !nextDraft.summary) return res.json({
+    if (!nextDraft.summary) return res.json({
+      reply: parsed.reply || "I didn't catch the issue. Please describe the campus problem.",
+      draft: nextDraft, awaiting: true, parsedBy: parsed.parsedBy,
+    });
+    if (parsed.awaiting || !nextDraft.location) return res.json({
       reply: parsed.reply || 'Where is this happening? Please tell me the block or area.',
       draft: nextDraft, awaiting: true, parsedBy: parsed.parsedBy,
     });
-    if (!nextDraft.location) nextDraft.location = 'Not specified';
 
     const created = await createTicket({
       summary: nextDraft.summary,
