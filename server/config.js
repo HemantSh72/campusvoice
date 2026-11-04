@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 function loadDotEnvLocal() {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) return;
   try {
     for (const line of readFileSync(resolve(process.cwd(), '.env.local'), 'utf8').split(/\r?\n/)) {
       const trimmed = line.trim();
