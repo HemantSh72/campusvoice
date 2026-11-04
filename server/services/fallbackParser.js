@@ -69,12 +69,17 @@ const LOCATION_PATTERNS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function matchesKeyword(lower, keyword) {
+  return keyword.includes(' ')
+    ? lower.includes(keyword)
+    : new RegExp('(^|[^a-z0-9])' + keyword + '([^a-z0-9]|$)', 'i').test(lower);
+}
+
 function detectCategory(text) {
   const lower = text.toLowerCase();
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     for (const kw of keywords) {
-      const found = kw.includes(' ') ? lower.includes(kw) : new RegExp('(^|[^a-z0-9])' + kw + '([^a-z0-9]|$)', 'i').test(lower);
-      if (found) return cat === 'food' ? 'mess' : cat;
+      if (matchesKeyword(lower, kw)) return cat === 'food' ? 'mess' : cat;
     }
   }
   return 'other';
@@ -82,10 +87,10 @@ function detectCategory(text) {
 function detectPriority(text) {
   const lower = text.toLowerCase();
   for (const kw of CRITICAL_KEYWORDS) {
-    if (lower.includes(kw)) return 'critical';
+    if (matchesKeyword(lower, kw)) return 'critical';
   }
   for (const kw of HIGH_KEYWORDS) {
-    if (lower.includes(kw)) return 'high';
+    if (matchesKeyword(lower, kw)) return 'high';
   }
   return 'medium';
 }
