@@ -9,7 +9,7 @@
 // Order matters: more specific categories are checked first to avoid false positives.
 // safety and library are checked before it/hostel to prevent keyword overlap.
 const CATEGORY_KEYWORDS = {
-  safety:      ['fire', 'smoke', 'emergency', 'danger', 'threat', 'fight', 'violence', 'eve teasing', 'harassment', 'ragging', 'theft', 'stolen', 'medical emergency', 'injured', 'accident', 'ambulance'],
+  safety:      ['fire', 'smoke', 'emergency', 'danger', 'unsafe', 'threat', 'fight', 'violence', 'eve teasing', 'harassment', 'ragging', 'theft', 'stolen', 'medical', 'injured', 'accident', 'ambulance', 'assault', 'sexual assault', 'stalking', 'weapon', 'gas leak', 'electric shock', 'electrical sparks'],
   library:     ['library', 'reading room', 'journal', 'librarian', 'catalogue', 'borrow'],
   mess:        ['mess', 'canteen', 'cafeteria', 'meal', 'lunch', 'dinner', 'breakfast', 'khana', 'bhojan', 'tiffin', 'cook', 'chef'],
   academics:   ['class', 'lecture', 'professor', 'teacher', 'faculty', 'exam', 'attendance', 'marks', 'grade', 'result', 'certificate', 'syllabus', 'assignment', 'timetable'],
@@ -30,8 +30,8 @@ const CRITICAL_KEYWORDS = [
 
 // High priority keywords
 const HIGH_KEYWORDS = [
-  'no water', 'no power', 'power cut', 'power outage', 'flood', 'flooded',
-  'sewage overflow', 'gas leak', 'everyone', 'whole block', 'entire',
+  'no water', 'no power', 'no electricity', 'power cut', 'power outage', 'electricity outage', 'water supply stopped', 'network outage', 'internet outage', 'flood', 'flooded',
+  'sewage overflow', 'everyone', 'whole block', 'entire',
 ];
 
 // Status intent patterns
