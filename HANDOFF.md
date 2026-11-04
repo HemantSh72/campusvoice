@@ -10,7 +10,6 @@ Set local values in an untracked `.env.local`. Set production values in **Vercel
 | `GEMINI_MODEL_CHAIN` | Select ordered Gemini models | Comma-separated model IDs. Default: `gemini-3.1-flash-lite,gemini-3.5-flash-lite`. Confirm availability with `npm run smoke`. |
 | `GEMMA_MODEL` | Optional Gemma fallback | Exact API model ID from the smoke check's models.list output. Leave empty to skip Gemma. |
 | `LLM_DAILY_CAP_PER_MODEL` | Gemini quota guard | Default 450 requests/model/UTC day. |
-| `GEMMA_DAILY_CAP_PER_MODEL` | Gemma quota guard | Default 5000 requests/model/UTC day. |
 | `MONGODB_URI` | Production ticket storage | MongoDB Atlas → Cluster → Connect → Drivers → Node.js connection string. Create a database user and configure network access. |
 | `MONGODB_DB` | Database name | Use `campusvoice` unless you choose another name. |
 | `TELEGRAM_BOT_TOKEN` | Real alert delivery | Create a bot with [@BotFather](https://t.me/BotFather); copy its token privately. |
