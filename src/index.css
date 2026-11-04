@@ -705,3 +705,30 @@ input, textarea {
 ::-webkit-scrollbar-track { background: var(--color-bg); }
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+
+/* ─── Live status and retry controls ───────────────────────────────────────── */
+.status-detail {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+.retry-btn {
+  margin-left: 0.75rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: var(--radius-full);
+  color: #fca5a5;
+  font-size: 0.78rem;
+}
+.retry-btn:hover { background: rgba(239,68,68,0.12); }
+
+@media (max-width: 600px) {
+  .status-strip { align-items: stretch; }
+  .status-badge { font-size: 0.68rem; }
+  .typed-input-wrap { flex-direction: column; }
+  .send-btn { min-height: 42px; }
+  .ticket-row { flex-wrap: wrap; }
+  .ticket-actions { width: 100%; justify-content: flex-end; }
+  .dashboard-actions { flex-wrap: wrap; }
+}
