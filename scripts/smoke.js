@@ -20,7 +20,6 @@ function loadEnv() {
 loadEnv();
 
 let failureCount = 0;
-let failureCount = 0;
 const pass = (name, detail = '') => console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
 const fail = (name, error) => {
   failureCount += 1;
