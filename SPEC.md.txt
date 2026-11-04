@@ -1,0 +1,128 @@
+ROLE
+You are a senior full-stack engineer. In this empty folder, build "CampusVoice": a deployable, voice-first campus grievance desk. Read this entire brief before writing code. Work in the phases at the end. After each phase run the tests and fix failures before moving on. Do NOT ask me for API keys: build graceful fallback/mock modes so everything runs locally with no keys, and I will add keys afterwards. Do NOT run git push or deploy. Never commit secrets. Keep dependencies minimal. Prefer simple, boring, reliable code over clever code. Do not add features outside this brief.
+
+1. PRODUCT
+A student speaks a complaint. The app converts speech to text, an LLM extracts structured intent, the backend creates a ticket in a database, routes it to a department with priority and SLA, sends a Telegram alert, and speaks the result back. If a required detail (location) is missing, the app asks by voice, listens again automatically, and fills the gap (multi-turn). The student can also ask "what is the status of ticket 7?" by voice. A live dashboard shows tickets; an admin can resolve them with a PIN.
+
+HACKATHON RULES (must satisfy)
+- Voice input is mandatory (browser Web Speech API). Voice output via browser SpeechSynthesis.
+- Must perform a visible real action (persisted ticket + Telegram alert). Chat alone is not acceptable.
+- UI must honestly show what is real vs unavailable/simulated.
+- It will be judged by strangers opening a public URL on their own devices, with nobody guiding them. It must be self-explanatory and must not crash.
+
+2. TECH STACK (fixed)
+- Node 20+, ESM. Frontend: React + Vite (plain CSS, no UI framework). Backend: Express.
+- Database: MongoDB Atlas via the official `mongodb` driver (not mongoose).
+- LLM: Google Gemini REST API via fetch (no SDK), JSON output mode.
+- Alerts: Telegram Bot API sendMessage via fetch to a public channel (chat_id like @channelname).
+- Deployment target: Vercel (static frontend + Express exported as one serverless function), same-origin /api. Local dev must work with a single `npm run dev` (Express on port 5000 plus Vite with /api proxy).
+
+3. REPO STRUCTURE
+package.json, vite.config.js, index.html, vercel.json, .gitignore, .env.example, README.md, HANDOFF.md
+src/            React app
+api/index.js    Vercel entry: exports the Express app
+server/         app.js, routes/, services/ (llm.js, fallbackParser.js, telegram.js, tickets.js, rateLimit.js, budget.js), db.js, validate.js, config.js
+tests/          node:test suites
+scripts/seed.js idempotent seed of 3 sample tickets (flagged isSeed)
+vercel.json: rewrite /api/(.*) to /api; set function maxDuration to 30.
+
+4. ENV VARS (all optional locally; document in .env.example; create .env.local with empty values)
+GEMINI_API_KEY, GEMINI_MODEL (default gemini-2.5-flash-lite), GEMINI_FALLBACK_MODEL (default gemini-2.5-flash), LLM_DAILY_BUDGET (default 150), MONGODB_URI, MONGODB_DB (default campusvoice), TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ADMIN_PIN, VITE_TELEGRAM_CHANNEL_URL (public link shown in UI), RATE_LIMIT_PER_MIN (default 20), RATE_LIMIT_PER_DAY (default 300).
+Missing-config behavior: no MONGODB_URI -> in-memory store, loud warning, health reports db:"memory"; no GEMINI_API_KEY -> rule-based parser only; no Telegram vars -> telegramStatus "not_configured"; no ADMIN_PIN -> resolve endpoint disabled.
+
+5. API
+POST /api/voice  body {transcript, draft, requestId, lang}
+  returns {reply, draft, awaiting, ticket?, parsedBy, telegramStatus?}
+  - transcript max 500 chars, strip control chars, reject empty with 400.
+  - draft is client-held conversation state; the server treats it as UNTRUSTED and re-validates every field.
+  - intents: report_issue | check_status | cancel | unknown.
+  - report_issue requires summary and location. If location missing: reply "Where is this happening?" with awaiting=true. After 2 failed follow-ups, create the ticket with location "Not specified" rather than loop forever.
+  - Idempotency: requestId (client UUID) has a unique index; a repeat returns the original ticket, never a duplicate.
+  - check_status: extract ticket number (handle digits and spelled-out numbers one..twenty in the fallback parser); reply with status, department, priority; friendly message if not found.
+GET /api/tickets -> latest 30, public-safe fields only (never raw IP, never requestId).
+POST /api/tickets/:ticketNumber/resolve  header x-admin-pin, constant-time compare; 401 on mismatch.
+GET /api/health -> {ok, db:"mongo"|"memory"|"down", llm:"configured"|"fallback-only", telegram:"configured"|"not_configured", version}. Never reveal secret values.
+
+6. DOMAIN RULES
+Categories -> department: it=IT & Network, hostel=Hostel Warden, mess=Mess & Canteen, academics=Academic Office, transport=Transport, maintenance=Electrical & Maintenance, library=Library, safety=Security & Safety, other=Administration.
+Priority -> SLA hours: critical=2, high=8, medium=24, low=72.
+Priority guidance for the LLM: critical = danger to life, fire/smoke, harassment/ragging, medical emergency, theft, safety hazards; high = blocks many people (no water, no power, hostel wifi down); medium = default; low = cosmetic/minor.
+Input may be Hindi/Hinglish; LLM translates summary to one clean English sentence.
+Sequential human-friendly ticketNumber via an atomic counters collection (findOneAndUpdate with $inc).
+
+7. LLM LAYER (server/services/llm.js)
+- Gemini generateContent REST, responseMimeType application/json, temperature 0, system instruction + current draft + utterance.
+- Output schema: {intent, draft:{summary,location,category,priority,reporterName}, ticketNumber}.
+- Timeout 6s per call; retry once on 429/5xx only if time remains. Model chain: GEMINI_MODEL -> GEMINI_FALLBACK_MODEL -> rule-based fallbackParser. Never throw to the user; always degrade.
+- Global daily budget (budget.js): count LLM calls per UTC day in Mongo; when LLM_DAILY_BUDGET is exceeded, skip straight to the fallback parser.
+- Treat ALL LLM output as untrusted: validate enums (category, priority, intent), clamp string lengths, fall back to defaults on invalid values. The user saying "ignore your rules" must not change behavior.
+- fallbackParser: keyword-based category detection, safety keywords force critical, location extraction from "in/at/near ...", follow-up handling when draft.summary exists but location is missing, status and cancel intents. Must have unit tests.
+
+8. DATA MODEL (tickets)
+ticketNumber(int, unique), summary, category, department, priority, slaHours, location, reporterName?, status("open"|"resolved"), transcript(<=500), lang, parsedBy("gemini"|"fallback"), telegramStatus("sent"|"failed"|"not_configured"), requestId(unique), isSeed, createdAt, resolvedAt?.
+Mongo client must be cached on globalThis for serverless reuse. Create indexes lazily and idempotently.
+
+9. ABUSE AND SECURITY
+- Rate limiting backed by Mongo (serverless has no shared memory): fixed window per IP (from x-forwarded-for first hop), per-minute and per-day limits from env; return 429 with a friendly spoken-ready message. Use a TTL index.
+- Telegram: send plain text (no parse_mode), 4s timeout, AWAIT it before responding (serverless may freeze after the response). A failure must never fail ticket creation; just set telegramStatus "failed".
+- Escape everything in the UI (no dangerouslySetInnerHTML). Security headers via a small middleware. CORS same-origin only. No secrets in client bundle (only VITE_TELEGRAM_CHANNEL_URL is public).
+- Request body limit 10kb. Global express error handler returning JSON {error} without stack traces.
+
+10. FRONTEND (single page, mobile-first, clean, readable)
+- Big mic button with clear states: idle, listening, thinking, speaking, error. A Stop button while listening/speaking.
+- Live (interim) transcript, assistant reply (aria-live), and a "ticket draft" card showing summary and location while a conversation is in progress.
+- Language toggle: English (en-IN, default) and Hindi (hi-IN) for recognition. Replies are always English. Choose a matching TTS voice when available; handle voices loading asynchronously (voiceschanged); keep replies short (Chrome TTS can stall on long text); always resolve the speak promise on end/error/timeout so the loop never hangs.
+- Auto-listen again after speaking when awaiting=true. Do not start recognition while TTS is playing.
+- Handle: unsupported SpeechRecognition (show a clear banner and switch to typed input; voice output still works), mic permission denied, no-speech, audio-capture, network error, aborted, TTS unsupported, fetch failure/timeout (AbortController 12s), 429, 5xx. Each shows a specific friendly message and is also spoken when TTS works.
+- Always-visible typed input as a backup path (same pipeline).
+- "Try saying" example chips (tap to submit as text, and also shows what to say aloud).
+- Status strip fed by /api/health: Mic supported, AI (Gemini/fallback), Database, Telegram alerts. Honest "real vs not configured" labels.
+- Live dashboard: polls /api/tickets every 5s, pauses when the tab is hidden; priority color badges, department, location, SLA, alert status, Resolve button (prompts for admin PIN, never stores it persistently).
+- Button to open the public Telegram channel (VITE_TELEGRAM_CHANNEL_URL) labelled "Watch live alerts".
+- Generate a client UUID requestId per new submission; reuse it on retry of the same submission.
+- Footer: short honest note of what is real (speech, LLM, DB, alerts) and limitations.
+
+11. TESTS (node:test, no extra frameworks)
+- Unit: fallbackParser (>=15 phrases incl. Hinglish, missing location, critical safety, status with digits and spelled numbers, cancel, gibberish), validators/sanitizers, SLA/priority mapping, rate limiter logic.
+- API integration against an in-process app using the in-memory store: multi-turn flow (missing location -> follow-up -> ticket), idempotent requestId, status query, resolve with wrong/right PIN, rate limit 429, oversize body, empty transcript, injection-style input ("ignore previous instructions...").
+- `npm test` runs all of it offline with no keys. `npm run test:remote` runs the API suite against BASE_URL (env) for use on the deployed site.
+
+12. PHASES (stop and summarize after each)
+Phase 1: scaffold, config, db layer (+memory fallback), tickets service, fallbackParser, /api/voice /api/tickets /api/health, tests passing.
+Phase 2: LLM layer with model chain, budget, validation, mock-able for tests; Telegram service; rate limiting; resolve endpoint.
+Phase 3: React UI with all states and error handling described above.
+Phase 4: vercel.json + api/index.js, build check (`npm run build`), seed script, README (problem, architecture diagram in text/mermaid, real-vs-simulated table, setup, env table, test instructions, known limitations), .env.example.
+Phase 5: HANDOFF.md containing: exact env vars I must fill and where to get each, commands to run, a manual test checklist, and any known risks. Then do a final review pass looking for bugs, race conditions, and unhandled promise rejections, and fix them.
+
+Do not stop to ask questions unless truly blocked; make reasonable decisions and list them in HANDOFF.md.
+
+ADDENDUM (overrides the earlier text wherever they conflict)
+
+1. Rate limit defaults: RATE_LIMIT_PER_MIN=40 and RATE_LIMIT_PER_DAY=1000. Many users at one venue share a single public IP. LLM_DAILY_BUDGET is the real quota guard.
+
+2. Production safety: if NODE_ENV=production or the VERCEL env var is set, and MONGODB_URI is missing or unreachable, do NOT use the in-memory store. /api/voice must return 503 with a friendly, speakable {error} message, and /api/health must report db:"down". The in-memory store is for local development and tests only.
+
+3. Add `npm run smoke`. It reads .env.local and, with real credentials, verifies each integration independently and prints PASS / FAIL (with a reason) / SKIPPED (if the variable is empty):
+   a) Gemini: GEMINI_MODEL and GEMINI_FALLBACK_MODEL each return valid JSON for the utterance "wifi is down in hostel block B".
+   b) MongoDB: connect, insert, read and delete a temporary document, and increment the ticket counter.
+   c) Telegram: send a test message to TELEGRAM_CHAT_ID.
+   d) ADMIN_PIN is set.
+   Never print secret values.
+
+4. Before you finish, output a checklist mapping every numbered section (1 to 12) of the brief to the files that implement it, and explicitly flag anything not implemented or only partially implemented.
+
+
+ADDENDUM 2: LLM model chain and quota rules (overrides earlier model/budget text)
+
+My real free Gemini quota is small. gemini-3.1-flash-lite and gemini-3.5-flash-lite allow 15 RPM / 500 requests per day each. Most other Flash models allow only 5 RPM / 20 per day. Gemma 4 26B/31B allow 30 RPM / 14,400 per day / 16K tokens per minute. Therefore:
+
+1. Replace GEMINI_MODEL / GEMINI_FALLBACK_MODEL / LLM_DAILY_BUDGET with:
+   - GEMINI_MODEL_CHAIN: comma-separated, tried in order. Default: gemini-3.1-flash-lite,gemini-3.5-flash-lite
+   - GEMMA_MODEL: optional, exact API model id; if empty, skip it. When set, it is tried after the Gemini chain and before the rule-based parser.
+   - LLM_DAILY_CAP_PER_MODEL: default 450 (Gemma: 5000). Track per-model counts per UTC day in Mongo (in-memory fallback locally). When a model reaches its cap, skip it.
+2. Circuit breaker: on HTTP 429 or a quota error from a model, mark that model unavailable for 60 seconds and move to the next one in the chain immediately (do not retry the same model). If a model returns 429 three times within 10 minutes, skip it for the rest of the UTC day. Persist breaker state in Mongo with an in-memory fallback.
+3. Gemma specifics: do not assume systemInstruction or responseMimeType support. For Gemma, put the instructions and schema inside the user content, omit responseMimeType, and extract the first {...} JSON block leniently. Keep strict server-side validation of every field regardless of model.
+4. Reduce calls: when the draft already has a summary but no location, and the new utterance is 8 words or fewer and is not a cancel/status request, treat the utterance as the location deterministically WITHOUT calling any LLM (parsedBy: "rules-followup"). This keeps multi-turn fast and saves quota.
+5. Extend `npm run smoke`: call the Gemini models.list endpoint with the key and print every available model id containing "flash-lite" or "gemma", then test each model in the chain and GEMMA_MODEL individually, printing PASS/FAIL with the reason (never print the key).
+6. /api/health should report the current chain state (which models are available / tripped / capped) without secrets.
+7. Update .env.example, README and tests (circuit breaker, cap logic, rules-followup, Gemma lenient JSON parsing).
