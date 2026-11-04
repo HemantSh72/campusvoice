@@ -9,7 +9,7 @@ Set local values in an untracked `.env.local`. Set production values in **Vercel
 | `GEMINI_API_KEY` | Gemini parsing | Create at [Google AI Studio](https://aistudio.google.com/app/apikey). |
 | `GEMINI_MODEL_CHAIN` | Select ordered Gemini models | Comma-separated model IDs. Default: `gemini-3.1-flash-lite,gemini-3.5-flash-lite`. Confirm availability with `npm run smoke`. |
 | `GEMMA_MODEL` | Optional Gemma fallback | Exact API model ID from the smoke check's models.list output. Leave empty to skip Gemma. |
-| `LLM_DAILY_CAP_PER_MODEL` | Gemini quota guard | Default 450 requests/model/UTC day. |
+| `LLM_DAILY_CAP_PER_MODEL` | Per-model quota guard | Default 450 requests/model/UTC day for Gemini; Gemma is fixed at 5000. |
 | `MONGODB_URI` | Production ticket storage | MongoDB Atlas → Cluster → Connect → Drivers → Node.js connection string. Create a database user and configure network access. |
 | `MONGODB_DB` | Database name | Use `campusvoice` unless you choose another name. |
 | `TELEGRAM_BOT_TOKEN` | Real alert delivery | Create a bot with [@BotFather](https://t.me/BotFather); copy its token privately. |
@@ -96,8 +96,8 @@ npm run test:remote
 | 8. Data model and persistence | `server/db.js`, `server/services/tickets.js` | Implemented; production Atlas connection must be configured. |
 | 9. Abuse and security | `server/app.js`, `server/services/rateLimit.js`, `server/routes/tickets.js`, `server/validate.js`, `server/services/telegram.js` | Implemented for hackathon scope; admin PIN is not a full authentication system. |
 | 10. Frontend | `src/App.jsx`, `src/hooks/useSpeechRecognition.js`, `src/hooks/useTTS.js`, `src/index.css` | Implemented; test actual browsers/devices. |
-| 11. Tests | `tests/fallbackParser.test.js`, `tests/validators.test.js`, `tests/llm.test.js`, `tests/llmState.test.js`, `tests/api.integration.test.js`, `tests/api.remote.test.js` | Implemented in repository; execution status must be established by running the commands. |
-| 12. Phases and delivery | `README.md`, `HANDOFF.md`, `scripts/seed.js`, `scripts/smoke.js`, `package.json` | Deliverables present; live credentialed smoke and deployment are not performed here. |
+| 11. Tests | `tests/fallbackParser.test.js`, `tests/validators.test.js`, `tests/llm.test.js`, `tests/llmState.test.js`, `tests/api.integration.test.js`, `tests/productionSafety.test.js`, `tests/api.remote.test.js` | Implemented in repository; execution status must be established by running the commands. |
+| 12. Phases and delivery | `README.md`, `HANDOFF.md`, `scripts/seed.js`, `scripts/smoke.js`, `package.json`, `.github/workflows/ci.yml` | Deliverables present; live credentialed smoke and deployment are not performed here. |
 
 ### Explicitly not verified in this handoff
 
