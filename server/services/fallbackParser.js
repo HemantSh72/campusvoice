@@ -24,7 +24,7 @@ const CATEGORY_KEYWORDS = {
 const CRITICAL_KEYWORDS = [
   'fire', 'smoke', 'emergency', 'danger', 'threat', 'violence',
   'eve teasing', 'harassment', 'ragging', 'theft', 'stolen',
-  'injured', 'accident', 'ambulance', 'medical', 'help', 'sos',
+  'injured', 'accident', 'ambulance', 'medical', 'sos',
   'attacked', 'blood', 'unconscious', 'faint', 'poisoning',
 ];
 
@@ -73,7 +73,9 @@ function detectCategory(text) {
   const lower = text.toLowerCase();
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     for (const kw of keywords) {
-      if (lower.includes(kw)) {
+      const found = kw.includes(' ') ? lower.includes(kw) : new RegExp('\\\\b' + kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  for (const kw of keywords) {
+      if (lower.includes(kw)) {') + '\\\\b', 'i').test(lower);
+      if (found) {
         // Map 'food' (helper alias) to 'mess'
         return cat === 'food' ? 'mess' : cat;
       }
@@ -164,7 +166,7 @@ export function parse(text, draft = {}) {
     const currentFollowUpCount = draft.followUpCount || 0;
 
     // If we've already asked twice, give up and default location
-    if (currentFollowUpCount >= 2) {
+    if (currentFollowUpCount >= 1) {
       return {
         intent: 'report_issue',
         draft: {
