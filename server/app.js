@@ -33,7 +33,7 @@ app.use((req, res, next) => {
     'http://127.0.0.1:3000',
   ];
 
-  if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+  if (!origin || allowedOrigins.includes(origin)) {
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
@@ -67,10 +67,11 @@ app.use('/api', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('[error]', err.message);
   // Never expose stack traces to users
-  const status = err?.type === 'entity.too.large' ? 413 : 500;
+  const status = err?.type === 'entity.too.large' ? 413 : err?.type === 'entity.parse.failed' ? 400 : 500;
   res.status(status).json({
     error: status === 413
       ? 'Request is too large. Please shorten your message and try again.'
+      : status === 400 ? 'Request body must contain valid JSON.'
       : 'Something went wrong. Please try again.',
   });
 });
