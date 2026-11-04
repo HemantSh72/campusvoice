@@ -129,8 +129,10 @@ export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
         const remaining = deadline - Date.now();
         if (remaining < 500) break;
         if (!(await reserveModelCall(model, cap))) break;
+        const callBudget = deadline - Date.now();
+        if (callBudget < 500) break;
         try {
-          const parsed = await callModel(model, transcript, draft, Math.min(TIMEOUT_MS, remaining));
+          const parsed = await callModel(model, transcript, draft, Math.min(TIMEOUT_MS, callBudget));
           // Preserve the validated client draft and enforce the two-follow-up limit
           // even when a long answer is sent to Gemini and the model misses its location.
           if (draft.summary && !draft.location && !isStatusOrCancel(transcript)) {
