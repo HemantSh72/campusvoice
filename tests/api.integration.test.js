@@ -12,6 +12,8 @@ import http from 'node:http';
 // Force in-memory mode (no MONGODB_URI)
 process.env.MONGODB_URI = '';
 process.env.GEMINI_API_KEY = '';    // Force fallback parser
+process.env.RATE_LIMIT_PER_MIN = '40';
+process.env.RATE_LIMIT_PER_DAY = '1000';
 const TEST_PIN = process.env.TEST_ADMIN_PIN || 'test1234';
 process.env.ADMIN_PIN = TEST_PIN;
 process.env.NODE_ENV = 'test';      // Not production — allow in-memory
