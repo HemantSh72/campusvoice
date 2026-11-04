@@ -63,7 +63,7 @@ export function parseOutput(raw, gemma = false) {
 }
 
 function isStatusOrCancel(text) {
-  return /^\s*(?:cancel(?:\s+(?:this|that|it|the complaint))?|stop(?:\s+(?:this|that|the complaint))?|abort|quit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i.test(text) ||
+  return /^\s*(?:cancel(?:\s+(?:this|that|it|the complaint|my complaint))?|stop(?:\s+(?:this|that|the complaint))?|abort|quit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i.test(text) ||
     /\b(?:status|track|check)\b.*\bticket\b/i.test(text) ||
     /\bticket\s+(?:number\s+)?\d+\b/i.test(text);
 }
