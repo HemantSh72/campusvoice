@@ -71,7 +71,7 @@ function isStatusOrCancel(text) {
 export function parseRulesFollowup(transcript, draft = {}) {
   if (!draft.summary || draft.location || transcript.trim().split(/\s+/).length > 8 || isStatusOrCancel(transcript)) return null;
   const location = transcript.trim().replace(/^(?:at|in|near|inside)\s+/i, '').slice(0, 100);
-  if (location.length >= 2 && !/^(hmm+|ok|okay|um+|uh+|yes|no|idk|dunno|i don't know|i do not know)$/i.test(location)) {
+  if (location.length >= 2 && !/^(hmm+|ok|okay|um+|uh+|yes|no|idk|dunno|i don'?t know(?: where)?|i do not know(?: where)?|not sure|no idea|dunno where)$/i.test(location)) {
     return { intent: 'report_issue', draft: { ...draft, location }, ticketNumber: null, parsedBy: 'rules-followup' };
   }
   return { ...fallbackParse(transcript, draft), parsedBy: 'rules-followup' };
