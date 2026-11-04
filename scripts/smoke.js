@@ -136,4 +136,3 @@ else skip('ADMIN_PIN', 'ADMIN_PIN is empty');
 
 console.log('\nSmoke checks finished. SKIPPED checks require credentials; FAIL checks need attention.\n');
 if (failureCount > 0) process.exitCode = 1;
-if (failureCount > 0) process.exitCode = 1;
