@@ -59,7 +59,7 @@ async function ensureIndexes(db) {
       if (!currentTicketIndexes.some((index) => index.key?.requestId === 1 && index.unique)) {
         await tickets.createIndex(
           { requestId: 1 },
-          { unique: true, partialFilterExpression: { requestId: { $type: 'string' } }, name: 'requestId_unique_string' },
+          { unique: true, sparse: true },
         );
       }
 
