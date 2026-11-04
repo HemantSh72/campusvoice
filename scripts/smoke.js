@@ -12,15 +12,17 @@ function loadEnv() {
       if (!trimmed || trimmed.startsWith('#')) continue;
       const index = trimmed.indexOf('=');
       if (index > 0 && !(trimmed.slice(0, index).trim() in process.env)) {
-        process.env[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim();
+        process.env[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim().replace(/^(['\"])(.*)\\1$/, '$2');
       }
     }
   } catch {}
 }
 loadEnv();
 
+let failureCount = 0;
 const pass = (name, detail = '') => console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
 const fail = (name, error) => {
+  failureCount += 1;
   let reason = error?.message || String(error);
   for (const key of ['GEMINI_API_KEY', 'TELEGRAM_BOT_TOKEN', 'MONGODB_URI', 'ADMIN_PIN']) {
     const secret = process.env[key];
@@ -129,3 +131,4 @@ if (process.env.ADMIN_PIN) pass('ADMIN_PIN', 'configured (value hidden)');
 else skip('ADMIN_PIN', 'ADMIN_PIN is empty');
 
 console.log('\nSmoke checks finished. SKIPPED checks require credentials; FAIL checks need attention.\n');
+if (failureCount > 0) process.exitCode = 1;
