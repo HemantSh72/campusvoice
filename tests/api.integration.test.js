@@ -12,6 +12,9 @@ import http from 'node:http';
 // Force in-memory mode (no MONGODB_URI)
 process.env.MONGODB_URI = '';
 process.env.GEMINI_API_KEY = '';    // Force fallback parser
+process.env.TELEGRAM_BOT_TOKEN = '';
+process.env.TELEGRAM_CHAT_ID = '';
+delete process.env.VERCEL;
 process.env.RATE_LIMIT_PER_MIN = '40';
 process.env.RATE_LIMIT_PER_DAY = '1000';
 const TEST_PIN = process.env.TEST_ADMIN_PIN || 'test1234';
@@ -66,7 +69,6 @@ function get(path, headers) { return request('GET', path, null, headers); }
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 before(async () => {
-  if (process.env.BASE_URL) { baseUrl = process.env.BASE_URL.replace(/\\/$/, ''); return; }
   // Load configuration only after the test environment is configured above.
   ({ resetMemStore } = await import('../server/db.js'));
   ({ default: app } = await import('../server/app.js'));
@@ -82,7 +84,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  resetMemStore?.();
+  resetMemStore();
 });
 
 after(async () => {
@@ -95,7 +97,7 @@ describe('GET /api/health', () => {
   test('returns health with db=memory in test', async () => {
     const { status, body } = await get('/api/health');
     assert.equal(status, 200);
-    assert.ok(process.env.BASE_URL ? ['mongo', 'memory', 'down'].includes(body.db) : body.db === 'memory');
+    assert.equal(body.db, 'memory');
     assert.equal(body.llm, 'fallback-only');
     assert.equal(body.ok, true);
   });
@@ -318,7 +320,7 @@ describe('POST /api/tickets/:id/resolve', () => {
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
 describe('Rate limiting', () => {
-  test('returns 429 after the per-minute limit is exceeded', { skip: Boolean(process.env.BASE_URL) }, async () => {
+  test('returns 429 after the per-minute limit is exceeded', async () => {
     let last;
     for (let i = 0; i < 41; i += 1) {
       last = await post('/api/voice', { transcript: 'status of ticket 999' });
