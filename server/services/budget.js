@@ -1,58 +1,37 @@
 /**
- * server/services/budget.js
- * Daily LLM call budget tracker.
- * Backed by MongoDB (or in-memory in dev/test).
- * Resets at UTC midnight.
+ * Per-model daily quota and circuit-breaker state.
  */
-
-import { getDB } from '../db.js';
 import config from '../config.js';
+import { getModelState, incrementModelCount, recordModelQuotaFailure } from '../db.js';
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+const utcDate = () => new Date().toISOString().slice(0, 10);
+
+export function capForModel(model) {
+  return model.toLowerCase().includes('gemma') ? config.gemmaDailyCap : config.llmDailyCapPerModel;
 }
 
-/**
- * Returns true if LLM calls are within daily budget.
- * Returns false if budget exceeded → caller should use fallbackParser.
- */
-export async function checkBudget() {
-  if (config.llmDailyBudget <= 0) return false; // 0 means disabled
-  try {
-    const { db, mem } = await getDB();
-    const key = todayKey();
-
-    if (mem) {
-      return (mem.budgets.get(key) || 0) < config.llmDailyBudget;
-    }
-
-    const doc = await db.collection('budgets').findOne({ dateKey: key });
-    return (doc?.count || 0) < config.llmDailyBudget;
-  } catch {
-    // On error, allow LLM usage (fail open)
-    return true;
-  }
+export async function modelAvailability(model, now = Date.now()) {
+  const state = await getModelState(model);
+  const date = utcDate();
+  const count = state?.dailyDate === date ? state.dailyCount || 0 : 0;
+  const blockedUntil = state?.dailyDate === date ? state.blockedUntil || 0 : 0;
+  const blockedForDay = state?.dailyDate === date && Boolean(state.blockedForDay);
+  const cap = capForModel(model);
+  if (blockedForDay || blockedUntil > now) return { available: false, reason: blockedForDay ? 'quota breaker tripped for today' : 'temporarily unavailable', count, cap, blockedUntil };
+  if (cap <= 0 || count >= cap) return { available: false, reason: 'daily cap reached', count, cap, blockedUntil: 0 };
+  return { available: true, reason: 'available', count, cap, blockedUntil: 0 };
 }
 
-/**
- * Increment today's LLM call counter.
- */
-export async function incrementBudget() {
-  try {
-    const { db, mem } = await getDB();
-    const key = todayKey();
+export async function recordModelSuccess(model) {
+  return incrementModelCount(model, utcDate());
+}
 
-    if (mem) {
-      mem.budgets.set(key, (mem.budgets.get(key) || 0) + 1);
-      return;
-    }
+export async function recordQuotaFailure(model) {
+  return recordModelQuotaFailure(model);
+}
 
-    await db.collection('budgets').updateOne(
-      { dateKey: key },
-      { $inc: { count: 1 } },
-      { upsert: true }
-    );
-  } catch {
-    // Non-fatal
-  }
+export async function getModelChainHealth(models) {
+  const result = {};
+  for (const model of models) result[model] = await modelAvailability(model);
+  return result;
 }
