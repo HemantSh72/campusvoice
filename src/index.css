@@ -732,3 +732,12 @@ input, textarea {
   .ticket-actions { width: 100%; justify-content: flex-end; }
   .dashboard-actions { flex-wrap: wrap; }
 }
+
+
+/* Small secondary labels used by the status and dashboard panels. */
+.muted-small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
