@@ -19,7 +19,7 @@ export async function reserveModelCall(model, cap) {
     if (error.code !== 11000) throw error;
   }
   return Boolean(await col.findOneAndUpdate(
-    { model, dateKey, count: { $lt: cap } }, { $inc: { count: 1 } }, { returnDocument: 'after' }
+    { model, dateKey, count: { $lt: cap } }, { $inc: { count: 1 } }, { returnDocument: 'after', includeResultMetadata: false }
   ));
 }
 
