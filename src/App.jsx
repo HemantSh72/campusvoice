@@ -271,7 +271,6 @@ export default function App() {
       <footer className="app-footer">
         Speech recognition and speech output run in your browser. Tickets are stored in the configured database; local development without MongoDB uses temporary memory only. Gemini and Telegram are real integrations only when configured. This demo is not an emergency service.
       </footer>
-    </div>
       </div>
       <aside className="detail-panel" aria-label="Create and respond to grievances">
         <div className="panel-heading"><p className="workspace-kicker">QUICK ACTION</p><h2>Report an issue</h2></div>
