@@ -13,7 +13,11 @@ export async function reserveModelCall(model, cap) {
     return true;
   }
   const col = db.collection('llmUsage');
-  await col.updateOne({ model, dateKey }, { $setOnInsert: { model, dateKey, count: 0 } }, { upsert: true });
+  try {
+    await col.updateOne({ model, dateKey }, { $setOnInsert: { model, dateKey, count: 0 } }, { upsert: true });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+  }
   return Boolean(await col.findOneAndUpdate(
     { model, dateKey, count: { $lt: cap } }, { $inc: { count: 1 } }, { returnDocument: 'after' }
   ));
