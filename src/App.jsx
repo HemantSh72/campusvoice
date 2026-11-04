@@ -48,6 +48,7 @@ export default function App() {
   const [dashboardError, setDashboardError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
   const pendingRequest = useRef(null);
+  const stopRequested = useRef(false);
   const speech = useSpeechRecognition();
   const { supported: ttsSupported, speaking: ttsSpeaking, speak, stop: stopTTS } = useTTS();
 
@@ -64,6 +65,7 @@ export default function App() {
     setMessage(clean);
     setApiError('');
     setAutoListen(false);
+    stopRequested.current = false;
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
@@ -90,7 +92,7 @@ export default function App() {
       setFailedTranscript('');
       pendingRequest.current = null;
       await speak(spokenReply, 'en-IN');
-      if (data.awaiting) setAutoListen(true);
+      if (data.awaiting && !stopRequested.current) setAutoListen(true);
     } catch (error) {
       const friendly = error.name === 'AbortError'
         ? 'The request took too long. Check your connection and retry.'
@@ -119,6 +121,7 @@ export default function App() {
 
   const startListening = () => {
     if (busy || ttsSpeaking) return;
+    stopRequested.current = false;
     stopTTS();
     speech.start(lang, submitTranscript);
   };
@@ -233,7 +236,7 @@ export default function App() {
             {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : speech.error ? 'Microphone error — see guidance below' : 'Ready when you are'}
           </p>
           {(speech.listening || ttsSpeaking) && (
-            <button className="stop-button" type="button" onClick={() => { speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
+            <button className="stop-button" type="button" onClick={() => { stopRequested.current = true; speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
           )}
           {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
           {!ttsSupported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
