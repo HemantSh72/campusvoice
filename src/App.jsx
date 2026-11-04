@@ -96,7 +96,9 @@ export default function App() {
     } catch (error) {
       const friendly = error.name === 'AbortError'
         ? 'The request took too long. Check your connection and retry.'
-        : (error.message || 'Could not reach CampusVoice. Please try again.');
+        : error instanceof TypeError
+          ? 'Could not connect to CampusVoice. Check your internet connection and retry.'
+          : (error.message || 'Could not reach CampusVoice. Please try again.');
       setApiError(friendly);
       setReply(friendly);
       setFailedTranscript(clean);
@@ -230,7 +232,7 @@ export default function App() {
               onClick={speech.listening ? speech.stop : startListening}
               disabled={busy || ttsSpeaking || (!speech.supported && !speech.listening)}
               aria-label={speech.listening ? 'Stop listening' : 'Start voice input'}
-            >{speech.listening ? '■' : busy ? '…' : '🎙️'}</button>
+            >{speech.listening ? '■' : busy ? '…' : ttsSpeaking ? '🔊' : '🎙️'}</button>
           </div>
           <p className="mic-state-label" aria-live="polite">
             {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : speech.error ? 'Microphone error — see guidance below' : 'Ready when you are'}
