@@ -124,6 +124,7 @@ export default function App() {
   const startListening = () => {
     if (busy || ttsSpeaking) return;
     stopRequested.current = false;
+    setAutoListen(false);
     stopTTS();
     speech.start(lang, submitTranscript);
   };
@@ -247,7 +248,7 @@ export default function App() {
             {message && <p className="transcript-final">You said: {message}</p>}
             {speech.interimTranscript && <p className="transcript-interim">{speech.interimTranscript}</p>}
           </div>
-          {awaiting && <p className="warning-banner">One more detail needed: tell me the location. The microphone will listen again after this question.</p>}
+          {awaiting && <p className="warning-banner">One more detail needed: {draft.summary ? 'tell me the location.' : 'describe the campus issue.'} The microphone will listen again after this question.</p>}
         </section>
 
         <section className="card">
