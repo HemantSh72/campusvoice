@@ -76,7 +76,7 @@ npm run test:remote
 - Gemini model availability and free quotas are account-specific and may change. Run `npm run smoke` after adding the key; choose only model IDs actually returned by models.list.
 - The Gemini model chain uses per-model UTC daily caps. Quota responses trip a 60-second breaker; three quota failures in ten minutes trip the model for the rest of the UTC day.
 - MongoDB is mandatory in production. Local in-memory storage is intentionally not a production fallback.
-- The smoke test increments the `ticketNumber` counter and therefore consumes one sequence number in the target database.
+- The smoke test increments the `ticketNumber` counter and therefore consumes one sequence number in the target database. The seed script requires MongoDB; it skips in memory-only mode because that data would vanish when the script exits.
 - Telegram alerts are awaited before the voice API responds. A Telegram failure is recorded but does not undo a ticket.
 - Public dashboard data includes issue summaries and locations. Ask students not to submit sensitive personal details.
 - Admin PIN is a shared secret suitable only for the hackathon demo. It is not a user-account system.
