@@ -5,7 +5,7 @@
  * node --test tests/api.integration.test.js
  */
 
-import { test, describe, before, beforeEach } from 'node:test';
+import { test, describe, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 
@@ -15,8 +15,8 @@ process.env.GEMINI_API_KEY = '';    // Force fallback parser
 process.env.ADMIN_PIN = 'test1234';
 process.env.NODE_ENV = 'test';      // Not production — allow in-memory
 
-import { resetMemStore } from '../server/db.js';
-import app from '../server/app.js';
+let resetMemStore;
+let app;
 
 // ─── Test HTTP client helpers ─────────────────────────────────────────────────
 
@@ -63,6 +63,10 @@ function get(path, headers) { return request('GET', path, null, headers); }
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 before(async () => {
+  // Load configuration only after the test environment is configured above.
+  ({ resetMemStore } = await import('../server/db.js'));
+  ({ default: app } = await import('../server/app.js'));
+
   await new Promise((resolve) => {
     server = http.createServer(app);
     server.listen(0, '127.0.0.1', () => {
@@ -75,6 +79,10 @@ before(async () => {
 
 beforeEach(() => {
   resetMemStore();
+});
+
+after(async () => {
+  if (server) await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
 });
 
 // ─── Health ───────────────────────────────────────────────────────────────────
