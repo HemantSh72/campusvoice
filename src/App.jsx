@@ -93,7 +93,7 @@ export default function App() {
       setApiError(friendly);
       setReply(friendly);
       setFailedTranscript(clean);
-      await tts.speak(friendly, 'en-IN');
+      await speak(friendly, 'en-IN');
     } finally {
       setBusy(false);
     }
@@ -103,17 +103,17 @@ export default function App() {
     if (!autoListen || busy || ttsSpeaking || !speech.supported) return;
     setAutoListen(false);
     speech.start(lang, submitTranscript);
-  }, [autoListen, busy, tts.speaking, speech.supported, speech.start, lang, submitTranscript]);
+  }, [autoListen, busy, ttsSpeaking, speech.supported, speech.start, lang, submitTranscript]);
 
   useEffect(() => {
     if (!speech.error || speech.error === 'aborted') return;
     const friendly = FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed. Please try again or type your complaint.';
     setReply(friendly);
-    tts.speak(friendly, 'en-IN');
+    speak(friendly, 'en-IN');
   }, [speech.error, speak]);
 
   const startListening = () => {
-    if (busy || tts.speaking) return;
+    if (busy || ttsSpeaking) return;
     stopTTS();
     speech.start(lang, submitTranscript);
   };
@@ -215,20 +215,20 @@ export default function App() {
             <button className={lang === 'hi-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('hi-IN')} type="button">हिन्दी</button>
           </div>
           <div className="mic-button-wrap">
-            <div className={'mic-ring ' + (speech.listening ? 'listening' : tts.speaking ? 'speaking' : '')} />
+            <div className={'mic-ring ' + (speech.listening ? 'listening' : ttsSpeaking ? 'speaking' : '')} />
             <button
-              className={'mic-button ' + (speech.listening ? 'listening' : busy ? 'thinking' : tts.speaking ? 'speaking' : 'idle')}
+              className={'mic-button ' + (speech.listening ? 'listening' : busy ? 'thinking' : ttsSpeaking ? 'speaking' : 'idle')}
               type="button"
               onClick={speech.listening ? speech.stop : startListening}
-              disabled={busy || tts.speaking || (!speech.supported && !speech.listening)}
+              disabled={busy || ttsSpeaking || (!speech.supported && !speech.listening)}
               aria-label={speech.listening ? 'Stop listening' : 'Start voice input'}
             >{speech.listening ? '■' : busy ? '…' : '🎙️'}</button>
           </div>
           <p className="mic-state-label" aria-live="polite">
-            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : tts.speaking ? 'Speaking response…' : 'Ready when you are'}
+            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : 'Ready when you are'}
           </p>
-          {(speech.listening || tts.speaking) && (
-            <button className="stop-button" type="button" onClick={() => { speech.stop(); tts.stop(); setAutoListen(false); }}>Stop</button>
+          {(speech.listening || ttsSpeaking) && (
+            <button className="stop-button" type="button" onClick={() => { speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
           )}
           {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
           {!ttsSupported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
