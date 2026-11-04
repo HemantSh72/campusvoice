@@ -75,9 +75,10 @@ const statusOrCancel = (text) =>
 export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
   if (draft.summary && !draft.location && transcript.trim().split(/\s+/).length <= 8 && !statusOrCancel(transcript)) {
     const location = transcript.trim().replace(/^(?:at|in|near|inside)\s+/i, '').slice(0, 100);
-    if (location.length >= 2 && !/^(hmm+|ok|okay|um+|uh+|yes|no|idk)$/i.test(location)) {
+    if (location.length >= 2 && !/^(hmm+|ok|okay|um+|uh+|yes|no|idk|dunno|i don't know)$/i.test(location)) {
       return { intent: 'report_issue', draft: { ...draft, location }, ticketNumber: null, parsedBy: 'rules-followup' };
     }
+    return { ...fallbackParse(transcript, draft), parsedBy: 'rules-followup' };
   }
   if (!config.geminiApiKey) return { ...fallbackParse(transcript, draft), parsedBy: 'fallback' };
 
