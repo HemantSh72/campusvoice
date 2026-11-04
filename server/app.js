@@ -18,7 +18,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'microphone=(self), geolocation=()');
   next();
 });
 
@@ -67,8 +67,11 @@ app.use('/api', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('[error]', err.message);
   // Never expose stack traces to users
-  res.status(500).json({
-    error: 'Something went wrong. Please try again.',
+  const status = err?.type === 'entity.too.large' ? 413 : 500;
+  res.status(status).json({
+    error: status === 413
+      ? 'Request is too large. Please shorten your message and try again.'
+      : 'Something went wrong. Please try again.',
   });
 });
 
