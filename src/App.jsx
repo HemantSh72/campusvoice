@@ -107,7 +107,7 @@ export default function App() {
   }, [busy, draft, lang, speak, speech.stop, stopTTS]);
 
   useEffect(() => {
-    if (!autoListen || busy || ttsSpeaking || !speech.supported) return;
+    if (!autoListen || stopRequested.current || busy || ttsSpeaking || !speech.supported) return;
     setAutoListen(false);
     speech.start(lang, submitTranscript);
   }, [autoListen, busy, ttsSpeaking, speech.supported, speech.start, lang, submitTranscript]);
