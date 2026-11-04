@@ -15,7 +15,7 @@ function loadDotEnvLocal() {
       if (index < 1) continue;
       const key = trimmed.slice(0, index).trim();
       const value = trimmed.slice(index + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
-      if (!(key in process.env)) process.env[key] = value;
+      if (!process.env[key]?.trim()) process.env[key] = value;
     }
   } catch { /* optional */ }
 }
