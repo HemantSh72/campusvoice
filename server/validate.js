@@ -4,7 +4,7 @@
  * All functions are pure — no side effects, no DB access.
  */
 
-import { timingSafeEqual as cryptoTimingSafeEqual } from 'crypto';
+import { createHash, timingSafeEqual as cryptoTimingSafeEqual } from 'node:crypto';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -134,11 +134,7 @@ export function comparePin(submitted, stored) {
   if (!stored) return false;
   if (typeof submitted !== 'string') return false;
 
-  const maxLen = Math.max(submitted.length, stored.length, 1);
-  const bufA = Buffer.alloc(maxLen);
-  const bufB = Buffer.alloc(maxLen);
-  bufA.write(submitted.slice(0, maxLen));
-  bufB.write(stored.slice(0, maxLen));
-
-  return cryptoTimingSafeEqual(bufA, bufB);
+  const digestA = createHash('sha256').update(submitted, 'utf8').digest();
+  const digestB = createHash('sha256').update(stored, 'utf8').digest();
+  return cryptoTimingSafeEqual(digestA, digestB);
 }
