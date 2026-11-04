@@ -160,18 +160,6 @@ export function parse(text, draft = {}) {
   if (draft.summary && !draft.location) {
     const currentFollowUpCount = draft.followUpCount || 0;
 
-    // If we've already asked twice, give up and default location
-    if (currentFollowUpCount >= 1) {
-      return {
-        intent: 'report_issue',
-        draft: {
-          ...draft,
-          location: 'Not specified',
-          followUpCount: currentFollowUpCount + 1,
-        },
-      };
-    }
-
     // Try to extract location from this utterance
     const extractedLocation = extractLocation(cleanText);
     // Also accept the raw text if it's short enough to be a location
@@ -190,6 +178,14 @@ export function parse(text, draft = {}) {
           location: resolvedLocation,
           followUpCount: currentFollowUpCount + 1,
         },
+      };
+    }
+
+    // After two failed follow-ups, stop asking and use the documented default.
+    if (currentFollowUpCount >= 1) {
+      return {
+        intent: 'report_issue',
+        draft: { ...draft, location: 'Not specified', followUpCount: currentFollowUpCount + 1 },
       };
     }
 
