@@ -12,6 +12,8 @@ class MemoryStore {
     this.counter = 0;
     this.rateLimits = new Map();
     this.modelStates = new Map();
+    this.llmUsage = new Map();
+    this.llmBreakers = new Map();
   }
 }
 let memStore = new MemoryStore();
@@ -59,6 +61,8 @@ async function ensureIndexes(db) {
         db.collection('rateLimits').createIndex({ key: 1 }, { unique: true, name: 'rate_limit_key_unique' }),
         db.collection('rateLimits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
         db.collection('llmState').createIndex({ dailyDate: 1 }),
+        db.collection('llmUsage').createIndex({ model: 1, dateKey: 1 }, { unique: true }),
+        db.collection('llmBreakers').createIndex({ model: 1 }, { unique: true }),
       ]);
     })().catch((error) => {
       indexesPromise = null;
