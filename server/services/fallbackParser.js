@@ -73,17 +73,12 @@ function detectCategory(text) {
   const lower = text.toLowerCase();
   for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     for (const kw of keywords) {
-      const found = kw.includes(' ') ? lower.includes(kw) : new RegExp('\\\\b' + kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\  for (const kw of keywords) {
-      if (lower.includes(kw)) {') + '\\\\b', 'i').test(lower);
-      if (found) {
-        // Map 'food' (helper alias) to 'mess'
-        return cat === 'food' ? 'mess' : cat;
-      }
+      const found = kw.includes(' ') ? lower.includes(kw) : new RegExp('(^|[^a-z0-9])' + kw + '([^a-z0-9]|$)', 'i').test(lower);
+      if (found) return cat === 'food' ? 'mess' : cat;
     }
   }
   return 'other';
 }
-
 function detectPriority(text) {
   const lower = text.toLowerCase();
   for (const kw of CRITICAL_KEYWORDS) {
