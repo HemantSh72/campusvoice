@@ -127,11 +127,9 @@ export async function getDB() {
 }
 
 export async function dbHealthCheck() {
-  if (!config.mongoUri) return config.isProduction ? 'down' : 'memory';
   try {
-    const client = await connectMongo();
-    await client.db('admin').command({ ping: 1 });
-    return 'mongo';
+    const { type } = await getDB();
+    return type;
   } catch {
     return config.isProduction ? 'down' : 'memory';
   }
