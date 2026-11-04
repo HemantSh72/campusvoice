@@ -6,7 +6,7 @@ import { getDepartment, getSlaHours } from '../validate.js';
 
 const PUBLIC_FIELDS = {
   ticketNumber: 1, summary: 1, category: 1, department: 1, priority: 1,
-  slaHours: 1, location: 1, reporterName: 1, status: 1, lang: 1,
+  slaHours: 1, location: 1, status: 1, lang: 1,
   parsedBy: 1, telegramStatus: 1, isSeed: 1, createdAt: 1, resolvedAt: 1, _id: 0,
 };
 
@@ -70,7 +70,7 @@ export async function createTicket(data) {
 async function findByRequestId({ db, mem }, requestId) {
   if (!requestId) return null;
   if (mem) return mem.tickets.get(requestId) || null;
-  return db.collection('tickets').findOne({ requestId }, { projection: { ...PUBLIC_FIELDS, transcript: 0 } });
+  return db.collection('tickets').findOne({ requestId }, { projection: PUBLIC_FIELDS });
 }
 
 export async function getTickets() {
