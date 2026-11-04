@@ -41,7 +41,7 @@ describe('Addendum 2 parsing', () => {
     assert.equal(result.draft.location, 'Hostel block B');
   });
   test('defaults after two failed location follow-ups', async () => {
-    const first = await parseWithLLM('I do not know', { summary: 'WiFi is not working', category: 'it', followUpCount: 0 });
+    const first = await parseWithLLM('idk', { summary: 'WiFi is not working', category: 'it', followUpCount: 0 });
     assert.equal(first.awaiting, true);
     const second = await parseWithLLM('dunno', first.draft);
     assert.equal(second.draft.location, 'Not specified');
