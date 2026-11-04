@@ -147,8 +147,9 @@ export function parse(text, draft = {}) {
   }
 
   // ── Status intent ──
-  const ticketNumber = extractTicketNumber(cleanText);
-  if (ticketNumber || detectStatusIntent(cleanText)) {
+  const statusIntent = detectStatusIntent(cleanText);
+  const ticketNumber = statusIntent ? extractTicketNumber(cleanText) : null;
+  if (statusIntent) {
     return {
       intent: 'check_status',
       draft: { ...draft },
