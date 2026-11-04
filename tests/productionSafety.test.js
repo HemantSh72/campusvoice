@@ -58,14 +58,14 @@ test('production mode returns 503 when MongoDB is unreachable', async () => {
     "  } catch (error) { console.error(error); process.exitCode = 1; }",
     "  finally { server.close(); }",
     "});",
-  ].join('\\n');
+  ].join('\n');
 
   const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', script], {
     cwd: process.cwd(),
     env: { ...process.env, NODE_ENV: 'production', MONGODB_URI: 'mongodb://127.0.0.1:1/campusvoice', GEMINI_API_KEY: '' },
     timeout: 15000,
   });
-  const result = JSON.parse(stdout.trim().split('\\n').at(-1));
+  const result = JSON.parse(stdout.trim().split('\n').at(-1));
   assert.equal(result.db, 'down');
   assert.equal(result.voiceStatus, 503);
   assert.match(result.voiceError, /database/i);
