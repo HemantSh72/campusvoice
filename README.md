@@ -75,7 +75,6 @@ All values are optional for local development. Add secrets to `.env.local` local
 | `GEMINI_MODEL_CHAIN` | Comma-separated Gemini model IDs in preference order | `gemini-3.1-flash-lite,gemini-3.5-flash-lite` |
 | `GEMMA_MODEL` | Optional exact Gemma API model ID; empty skips Gemma | empty |
 | `LLM_DAILY_CAP_PER_MODEL` | Per-model daily request cap for non-Gemma models (UTC) | `450` |
-| `GEMMA_DAILY_CAP_PER_MODEL` | Daily cap for configured Gemma model (UTC) | `5000` |
 | `MONGODB_URI` | MongoDB Atlas connection string | empty |
 | `MONGODB_DB` | Database name | `campusvoice` |
 | `TELEGRAM_BOT_TOKEN` | Bot token from Telegram's @BotFather | empty |
@@ -131,7 +130,7 @@ Ticket categories map to departments and priority maps to SLA: critical 2h, high
 
 ## LLM quota behavior
 
-The server tries `GEMINI_MODEL_CHAIN` in order, then `GEMMA_MODEL` when configured, then the fallback parser. Each model has an independent UTC daily cap. HTTP 429/quota errors open a 60-second circuit breaker and immediately move to the next model. Three quota failures within ten minutes block that model until UTC midnight. A short (eight words or fewer) answer to a pending location question is handled deterministically without an LLM request.
+The server tries `GEMINI_MODEL_CHAIN` in order, then `GEMMA_MODEL` when configured, then the fallback parser. Each model has an independent UTC daily cap: 450 by default for Gemini models and 5000 for Gemma. HTTP 429/quota errors open a 60-second circuit breaker and immediately move to the next model. Three quota failures within ten minutes block that model until UTC midnight. A short (eight words or fewer) answer to a pending location question is handled deterministically without an LLM request.
 
 Gemini receives system instructions and JSON response mode. Gemma receives the instructions and schema inside the user message, without relying on system-instruction or JSON-mode support; its first JSON object is extracted and all fields are validated server-side.
 
