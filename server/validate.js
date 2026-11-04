@@ -127,7 +127,7 @@ export function sanitizeDraft(raw) {
 
 /**
  * Constant-time PIN comparison using Node's crypto.timingSafeEqual.
- * Pads both sides to the same length to prevent length-based timing leaks.
+ * Compares fixed-length SHA-256 digests to avoid leaking the PIN length.
  * Returns true if submitted === stored, false otherwise.
  */
 export function comparePin(submitted, stored) {
