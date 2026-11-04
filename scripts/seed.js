@@ -3,7 +3,7 @@
  * Run with: npm run seed
  */
 import { getDB } from '../server/db.js';
-import { createTicket, getTickets } from '../server/services/tickets.js';
+import { createTicket } from '../server/services/tickets.js';
 
 const samples = [
   { summary: 'WiFi connectivity is unavailable in hostel block B', category: 'it', priority: 'high', location: 'Hostel block B' },
@@ -12,10 +12,12 @@ const samples = [
 ];
 
 const { db, mem } = await getDB();
-const existing = mem
-  ? [...mem.ticketsByNumber.values()].filter((ticket) => ticket.isSeed)
-  : await db.collection('tickets').countDocuments({ isSeed: true });
-if ((Array.isArray(existing) ? existing.length : existing) >= 3) {
+if (mem) {
+  console.log('Seed skipped: the in-memory store is process-local and cannot persist after this script exits. Set MONGODB_URI to seed persistent demo tickets.');
+  process.exit(0);
+}
+const existing = await db.collection('tickets').countDocuments({ isSeed: true });
+if (existing >= 3) {
   console.log('Seed skipped: three or more sample tickets already exist.');
   process.exit(0);
 }
