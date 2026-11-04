@@ -65,12 +65,23 @@ if (!apiKey) {
   for (const model of [...chain, ...(gemma ? [gemma] : [])]) skip(`Gemini ${model}`, 'GEMINI_API_KEY is empty');
 } else {
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(10_000) });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${data.error?.message || 'models.list failed'}`);
-    const ids = (data.models || []).map((model) => model.name?.replace(/^models\//, '')).filter((id) => id && /flash-lite|gemma/i.test(id));
-    pass('Gemini models.list', `${ids.length} matching model(s)`);
-    for (const id of ids) console.log(`  model: ${id}`);
+    const ids = new Set();
+    let pageToken = '';
+    do {
+      const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+      url.searchParams.set('key', apiKey);
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(\`HTTP \${response.status}: \${data.error?.message || 'models.list failed'}\`);
+      for (const model of data.models || []) {
+        const id = model.name?.replace(/^models\//, '');
+        if (id && /flash-lite|gemma/i.test(id)) ids.add(id);
+      }
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    pass('Gemini models.list', \`\${ids.size} matching model(s)\`);
+    for (const id of ids) console.log(\`  model: \${id}\`);
   } catch (error) { fail('Gemini models.list', error); }
   for (const model of [...new Set([...chain, ...(gemma ? [gemma] : [])])]) {
     try { await geminiCheck(model, apiKey); pass(`Gemini ${model}`, 'valid JSON response'); }
