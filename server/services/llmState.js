@@ -32,8 +32,10 @@ export async function modelIsBlocked(model) {
 export async function recordModelQuotaFailure(model) {
   const { db, mem } = await getDB();
   const now = Date.now();
-  const recent = (mem ? mem.llmBreakers.get(model)?.failures : (await db.collection('llmBreakers').findOne({ model }))?.failures || [])
-    .map((v) => new Date(v).getTime()).filter((v) => v >= now - 600000);
+  const failures = mem
+    ? (mem.llmBreakers.get(model)?.failures || [])
+    : ((await db.collection('llmBreakers').findOne({ model }))?.failures || []);
+  const recent = failures.map((v) => new Date(v).getTime()).filter((v) => v >= now - 600000);
   recent.push(now);
   const update = { model, failures: recent.map((v) => new Date(v)), blockedUntil: recent.length >= 3 ? utcEnd() : new Date(now + 60000) };
   if (mem) mem.llmBreakers.set(model, update);
