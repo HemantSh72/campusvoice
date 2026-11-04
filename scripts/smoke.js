@@ -12,7 +12,7 @@ function loadEnv() {
       if (!trimmed || trimmed.startsWith('#')) continue;
       const index = trimmed.indexOf('=');
       if (index > 0 && !(trimmed.slice(0, index).trim() in process.env)) {
-        process.env[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim().replace(/^(['\"])(.*)\\1$/, '$2');
+        process.env[trimmed.slice(0, index).trim()] = trimmed.slice(index + 1).trim().replace(/^(['"])(.*)\1$/, '$2');
       }
     }
   } catch {}
