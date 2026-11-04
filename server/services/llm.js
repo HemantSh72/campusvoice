@@ -118,7 +118,8 @@ export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
 
   const models = [...config.geminiModelChain, ...(config.gemmaModel ? [config.gemmaModel] : [])];
   for (const model of models) {
-    const cap = model === config.gemmaModel ? config.gemmaDailyCap : config.llmDailyCapPerModel;
+    const parserName = model.toLowerCase().includes('gemma') ? 'gemma' : 'gemini';
+    const cap = parserName === 'gemma' ? config.gemmaDailyCap : config.llmDailyCapPerModel;
     try {
       if (await modelIsBlocked(model)) continue;
       if (!(await reserveModelCall(model, cap))) continue;
@@ -146,31 +147,31 @@ export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
       if (draft.summary && !draft.location && !isStatusOrCancel(transcript)) {
         const mergedDraft = { ...draft, ...parsed.draft };
         if (mergedDraft.location) {
-          return { ...parsed, intent: 'report_issue', draft: mergedDraft, parsedBy: 'gemini', awaiting: false };
+          return { ...parsed, intent: 'report_issue', draft: mergedDraft, parsedBy: parserName, awaiting: false };
         }
         const count = Number(draft.followUpCount) || 0;
         if (count >= 1) {
           return {
             ...parsed, intent: 'report_issue',
             draft: { ...mergedDraft, location: 'Not specified', followUpCount: count + 1 },
-            parsedBy: 'gemini', awaiting: false,
+            parsedBy: parserName, awaiting: false,
           };
         }
         return {
           ...parsed, intent: 'report_issue',
           draft: { ...mergedDraft, followUpCount: count + 1 },
-          parsedBy: 'gemini', awaiting: true,
+          parsedBy: parserName, awaiting: true,
           reply: 'Where is this happening? Please tell me the block or area.',
         };
       }
       if (parsed.intent === 'report_issue' && parsed.draft.summary && !parsed.draft.location) {
         return {
           ...parsed, draft: { ...parsed.draft, followUpCount: 0 },
-          parsedBy: 'gemini', awaiting: true,
+          parsedBy: parserName, awaiting: true,
           reply: 'Where is this happening? Please tell me the block or area.',
         };
       }
-      return { ...parsed, draft: { ...draft, ...parsed.draft }, parsedBy: 'gemini' };
+      return { ...parsed, draft: { ...draft, ...parsed.draft }, parsedBy: parserName };
     } catch (error) {
       console.warn('[llm] ' + model + ' unavailable: ' + error.message);
     }
