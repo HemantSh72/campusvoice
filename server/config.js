@@ -35,7 +35,7 @@ const config = Object.freeze({
   geminiModelChain: [...new Set(modelChain)],
   gemmaModel: process.env.GEMMA_MODEL?.trim() || '',
   llmDailyCapPerModel: int(process.env.LLM_DAILY_CAP_PER_MODEL, 450, 0),
-  gemmaDailyCap: int(process.env.GEMMA_DAILY_CAP_PER_MODEL, 5000, 0),
+  gemmaDailyCap: 5000,
   mongoUri: process.env.MONGODB_URI || '',
   mongoDb: process.env.MONGODB_DB || 'campusvoice',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
