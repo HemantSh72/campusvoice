@@ -34,7 +34,10 @@ export function parseModelOutput(raw, model = '') {
     priority: source.priority || 'medium',
     ...(typeof source.reporterName === 'string' && source.reporterName.trim() ? { reporterName: source.reporterName.trim() } : {}),
   };
-  const number = Number.parseInt(normalized.ticketNumber, 10);
+  const rawNumber = normalized.ticketNumber;
+  const number = typeof rawNumber === 'number' && Number.isSafeInteger(rawNumber)
+    ? rawNumber
+    : typeof rawNumber === 'string' && /^\\d+$/.test(rawNumber) ? Number(rawNumber) : null;
   return { intent: normalized.intent, draft, ticketNumber: Number.isSafeInteger(number) && number > 0 ? number : null };
 }
 
