@@ -12,7 +12,8 @@ import http from 'node:http';
 // Force in-memory mode (no MONGODB_URI)
 process.env.MONGODB_URI = '';
 process.env.GEMINI_API_KEY = '';    // Force fallback parser
-process.env.ADMIN_PIN = 'test1234';
+const TEST_PIN = process.env.TEST_ADMIN_PIN || 'test1234';
+process.env.ADMIN_PIN = TEST_PIN;
 process.env.NODE_ENV = 'test';      // Not production — allow in-memory
 
 let resetMemStore;
@@ -63,6 +64,7 @@ function get(path, headers) { return request('GET', path, null, headers); }
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 before(async () => {
+  if (process.env.BASE_URL) { baseUrl = process.env.BASE_URL.replace(/\\/$/, ''); return; }
   // Load configuration only after the test environment is configured above.
   ({ resetMemStore } = await import('../server/db.js'));
   ({ default: app } = await import('../server/app.js'));
@@ -78,7 +80,7 @@ before(async () => {
 });
 
 beforeEach(() => {
-  resetMemStore();
+  resetMemStore?.();
 });
 
 after(async () => {
@@ -91,7 +93,7 @@ describe('GET /api/health', () => {
   test('returns health with db=memory in test', async () => {
     const { status, body } = await get('/api/health');
     assert.equal(status, 200);
-    assert.equal(body.db, 'memory');
+    assert.ok(process.env.BASE_URL ? ['mongo', 'memory', 'down'].includes(body.db) : body.db === 'memory');
     assert.equal(body.llm, 'fallback-only');
     assert.equal(body.ok, true);
   });
@@ -298,7 +300,7 @@ describe('POST /api/tickets/:id/resolve', () => {
     const { status, body } = await post(
       `/api/tickets/${ticketNum}/resolve`,
       {},
-      { 'x-admin-pin': 'test1234' }
+      { 'x-admin-pin': TEST_PIN }
     );
     assert.equal(status, 200);
     assert.equal(body.success, true);
@@ -314,22 +316,13 @@ describe('POST /api/tickets/:id/resolve', () => {
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
 describe('Rate limiting', () => {
-  test('returns 429 after per-minute limit is exceeded', async () => {
-    // Temporarily reduce the limit for this test
-    const original = process.env.RATE_LIMIT_PER_MIN;
-    process.env.RATE_LIMIT_PER_MIN = '2';
-
-    // Reset store to get fresh rate limit counters
-    resetMemStore();
-
-    // Need to reimport config to pick up new env... but config is already loaded.
-    // Instead, we'll directly test by making many requests quickly.
-    // For the test to work without reimporting config, we just verify the route works
-    // normally (rate limiting logic is tested indirectly via its own unit).
-    // Restore
-    process.env.RATE_LIMIT_PER_MIN = original || '40';
-
-    // This test passes if no crash occurs
-    assert.ok(true);
+  test('returns 429 after the per-minute limit is exceeded', { skip: Boolean(process.env.BASE_URL) }, async () => {
+    let last;
+    for (let i = 0; i < 41; i += 1) {
+      last = await post('/api/voice', { transcript: 'status of ticket 999' });
+      if (last.status === 429) break;
+    }
+    assert.equal(last.status, 429);
+    assert.ok(last.body.error);
   });
 });
