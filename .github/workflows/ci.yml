@@ -26,3 +26,17 @@ jobs:
         run: npm test
       - name: Build frontend
         run: npm run build
+      - name: Verify local development servers
+        run: |
+          npm run dev > /tmp/campusvoice-dev.log 2>&1 &
+          DEV_PID=$!
+          trap 'kill -TERM "$DEV_PID" 2>/dev/null || true; wait "$DEV_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/api/health > /tmp/campusvoice-health.json && curl -fsS http://127.0.0.1:3000/ > /dev/null; then
+              node -e "const h=require('/tmp/campusvoice-health.json'); if (!h.ok || h.db !== 'memory') process.exit(1);"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/campusvoice-dev.log
+          exit 1
