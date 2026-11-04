@@ -15,21 +15,29 @@ export function useSpeechRecognition() {
 
   const stop = useCallback(() => {
     const recognition = recognitionRef.current;
-    if (!recognition) return;
-    try { recognition.stop(); } catch { /* already stopped */ }
+    recognitionRef.current = null;
+    setListening(false);
+    setInterimTranscript('');
+    if (recognition) {
+      try { recognition.stop(); } catch { try { recognition.abort(); } catch {} }
+    }
   }, []);
 
   const start = useCallback((lang = 'en-IN', onResult) => {
     const Recognition = getRecognition();
     if (!Recognition) { setError('unsupported'); return false; }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch { /* ignored */ }
+    const previous = recognitionRef.current;
+    recognitionRef.current = null;
+    if (previous) {
+      try { previous.abort(); } catch { /* ignored */ }
     }
     callbackRef.current = onResult;
     completedRef.current = false;
+    setListening(false);
     setError(null);
     setTranscript('');
     setInterimTranscript('');
+
     const recognition = new Recognition();
     recognition.lang = lang;
     recognition.continuous = false;
@@ -37,8 +45,11 @@ export function useSpeechRecognition() {
     recognition.maxAlternatives = 1;
     recognitionRef.current = recognition;
 
-    recognition.onstart = () => setListening(true);
+    recognition.onstart = () => {
+      if (recognitionRef.current === recognition) setListening(true);
+    };
     recognition.onresult = (event) => {
+      if (recognitionRef.current !== recognition) return;
       let finalText = '';
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -55,7 +66,9 @@ export function useSpeechRecognition() {
       }
     };
     recognition.onerror = (event) => {
+      if (recognitionRef.current !== recognition) return;
       if (event.error !== 'aborted') setError(event.error || 'unknown');
+      recognitionRef.current = null;
       setListening(false);
       setInterimTranscript('');
     };
@@ -66,13 +79,22 @@ export function useSpeechRecognition() {
         setInterimTranscript('');
       }
     };
-    try { recognition.start(); return true; }
-    catch { setError('start-failed'); setListening(false); recognitionRef.current = null; return false; }
+    try {
+      recognition.start();
+      return true;
+    } catch {
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+      setError('start-failed');
+      setListening(false);
+      return false;
+    }
   }, []);
 
   useEffect(() => () => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch { /* ignored */ }
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      try { recognition.abort(); } catch { /* ignored */ }
     }
   }, []);
 
