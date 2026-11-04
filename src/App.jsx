@@ -217,7 +217,7 @@ export default function App() {
           <div className="mic-button-wrap">
             <div className={'mic-ring ' + (speech.listening ? 'listening' : ttsSpeaking ? 'speaking' : '')} />
             <button
-              className={'mic-button ' + (speech.listening ? 'listening' : busy ? 'thinking' : ttsSpeaking ? 'speaking' : 'idle')}
+              className={'mic-button ' + (apiError || speech.error ? 'error' : speech.listening ? 'listening' : busy ? 'thinking' : ttsSpeaking ? 'speaking' : 'idle')}
               type="button"
               onClick={speech.listening ? speech.stop : startListening}
               disabled={busy || ttsSpeaking || (!speech.supported && !speech.listening)}
@@ -300,7 +300,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="ticket-actions">
-                  {ticket.status === 'resolved' ? <span className="resolved-badge">Resolved</span> : <button className="resolve-btn" type="button" onClick={() => resolve(ticket.ticketNumber)}>Resolve</button>}
+                  {ticket.status === 'resolved' ? <span className="resolved-badge">Resolved</span> : health?.adminPin === 'configured' ? <button className="resolve-btn" type="button" onClick={() => resolve(ticket.ticketNumber)}>Resolve</button> : <span className="resolved-badge">Admin PIN not configured</span>}
                 </div>
               </article>
             ))}
