@@ -75,15 +75,15 @@ if (!apiKey) {
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(\`HTTP \${response.status}: \${data.error?.message || 'models.list failed'}\`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${data.error?.message || 'models.list failed'}`);
       for (const model of data.models || []) {
         const id = model.name?.replace(/^models\//, '');
         if (id && /flash-lite|gemma/i.test(id)) ids.add(id);
       }
       pageToken = data.nextPageToken || '';
     } while (pageToken);
-    pass('Gemini models.list', \`\${ids.size} matching model(s)\`);
-    for (const id of ids) console.log(\`  model: \${id}\`);
+    pass('Gemini models.list', `${ids.size} matching model(s)`);
+    for (const id of ids) console.log(`  model: ${id}`);
   } catch (error) { fail('Gemini models.list', error); }
   for (const model of [...new Set([...chain, ...(gemma ? [gemma] : [])])]) {
     try { await geminiCheck(model, apiKey); pass(`Gemini ${model}`, 'valid JSON response'); }
