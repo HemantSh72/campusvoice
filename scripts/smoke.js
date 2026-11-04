@@ -20,6 +20,7 @@ function loadEnv() {
 loadEnv();
 
 let failureCount = 0;
+let failureCount = 0;
 const pass = (name, detail = '') => console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
 const fail = (name, error) => {
   failureCount += 1;
@@ -103,10 +104,13 @@ if (!process.env.MONGODB_URI) {
       const col = db.collection('campusvoice_smoke');
       const id = `smoke-${Date.now()}-${Math.random().toString(16).slice(2)}`;
       await col.insertOne({ _id: id, createdAt: new Date() });
-      const found = await col.findOne({ _id: id });
-      if (!found) throw new Error('inserted document could not be read');
-      await col.deleteOne({ _id: id });
-      await db.collection('counters').findOneAndUpdate({ _id: 'ticketNumber' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' });
+      try {
+        const found = await col.findOne({ _id: id });
+        if (!found) throw new Error('inserted document could not be read');
+      } finally {
+        await col.deleteOne({ _id: id }).catch(() => {});
+      }
+      await db.collection('counters').findOneAndUpdate({ _id: 'ticketNumber' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after', includeResultMetadata: false });
       pass('MongoDB insert/read/delete + ticket counter', 'round-trip succeeded');
     } finally { await client.close(); }
   } catch (error) { fail('MongoDB round-trip + ticket counter', error); }
@@ -131,4 +135,5 @@ if (process.env.ADMIN_PIN) pass('ADMIN_PIN', 'configured (value hidden)');
 else skip('ADMIN_PIN', 'ADMIN_PIN is empty');
 
 console.log('\nSmoke checks finished. SKIPPED checks require credentials; FAIL checks need attention.\n');
+if (failureCount > 0) process.exitCode = 1;
 if (failureCount > 0) process.exitCode = 1;
