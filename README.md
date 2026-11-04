@@ -97,7 +97,7 @@ All values are optional for local development. Add secrets to `.env.local` local
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Start Express and Vite locally |
-| `npm test` | Run offline parser, validator, LLM-state and API integration tests |
+| `npm test` | Run offline parser, validator, LLM-state, production-safety and API integration tests |
 | `npm run build` | Build the static frontend into `dist/` |
 | `npm run preview` | Preview the built frontend |
 | `npm run seed` | Idempotently create three sample tickets in MongoDB |
