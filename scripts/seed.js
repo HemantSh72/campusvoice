@@ -15,7 +15,7 @@ const { db, mem } = await getDB();
 const existing = mem
   ? [...mem.ticketsByNumber.values()].filter((ticket) => ticket.isSeed)
   : await db.collection('tickets').countDocuments({ isSeed: true });
-if (existing >= 3) {
+if ((Array.isArray(existing) ? existing.length : existing) >= 3) {
   console.log('Seed skipped: three or more sample tickets already exist.');
   process.exit(0);
 }
