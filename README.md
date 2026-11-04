@@ -101,7 +101,7 @@ All values are optional for local development. Add secrets to `.env.local` local
 | `npm test` | Run offline parser, validator, LLM-state and API integration tests |
 | `npm run build` | Build the static frontend into `dist/` |
 | `npm run preview` | Preview the built frontend |
-| `npm run seed` | Idempotently create three sample tickets |
+| `npm run seed` | Idempotently create three sample tickets in MongoDB |
 | `npm run smoke` | Independently check configured Gemini, MongoDB, Telegram and admin settings |
 | `npm run test:remote` | Run deployed API checks against `BASE_URL` |
 
