@@ -20,8 +20,25 @@ export function parseModelOutput(raw, model = '') {
   catch {
     if (!gemma) throw new Error('Invalid JSON from Gemini response');
     const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
-    if (start < 0 || end <= start) throw new Error('No JSON object in Gemma response');
+    if (start < 0) throw new Error('No JSON object in Gemma response');
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+    for (let index = start; index < raw.length; index += 1) {
+      const char = raw[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === '\\\\') escaped = true;
+        else if (char === '"') inString = false;
+      } else if (char === '"') inString = true;
+      else if (char === '{') depth += 1;
+      else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) { end = index; break; }
+      }
+    }
+    if (end < start) throw new Error('Gemma JSON object was incomplete');
     parsed = JSON.parse(raw.slice(start, end + 1));
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid model object');
