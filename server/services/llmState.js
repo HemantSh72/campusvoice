@@ -36,14 +36,57 @@ export async function modelIsBlocked(model) {
 export async function recordModelQuotaFailure(model) {
   const { db, mem } = await getDB();
   const now = Date.now();
-  const failures = mem
-    ? (mem.llmBreakers.get(model)?.failures || [])
-    : ((await db.collection('llmBreakers').findOne({ model }))?.failures || []);
-  const recent = failures.map((v) => new Date(v).getTime()).filter((v) => v >= now - 600000);
-  recent.push(now);
-  const update = { model, failures: recent.map((v) => new Date(v)), blockedUntil: recent.length >= 3 ? utcEnd() : new Date(now + 60000) };
-  if (mem) mem.llmBreakers.set(model, update);
-  else await db.collection('llmBreakers').updateOne({ model }, { $set: update }, { upsert: true });
+  const cutoff = new Date(now - 600000);
+  const current = new Date(now);
+  const blockedForDay = utcEnd();
+  if (mem) {
+    const failures = (mem.llmBreakers.get(model)?.failures || [])
+      .map((value) => new Date(value).getTime())
+      .filter((value) => value >= now - 600000);
+    failures.push(now);
+    mem.llmBreakers.set(model, {
+      model,
+      failures: failures.map((value) => new Date(value)),
+      blockedUntil: failures.length >= 3 ? blockedForDay : new Date(now + 60000),
+    });
+    return;
+  }
+
+  const pipeline = [
+    {
+      $set: {
+        failures: {
+          $concatArrays: [
+            {
+              $filter: {
+                input: { $ifNull: ['$failures', []] },
+                as: 'failure',
+                cond: { $gte: ['$$failure', cutoff] },
+              },
+            },
+            [current],
+          ],
+        },
+      },
+    },
+    {
+      $set: {
+        blockedUntil: {
+          $cond: [
+            { $gte: [{ $size: '$failures' }, 3] },
+            blockedForDay,
+            new Date(now + 60000),
+          ],
+        },
+      },
+    },
+  ];
+  try {
+    await db.collection('llmBreakers').updateOne({ model }, pipeline, { upsert: true });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    await db.collection('llmBreakers').updateOne({ model }, pipeline);
+  }
 }
 
 export async function getModelChainState(models, caps) {
