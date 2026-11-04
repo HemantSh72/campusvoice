@@ -24,7 +24,7 @@ const CATEGORY_KEYWORDS = {
 const CRITICAL_KEYWORDS = [
   'fire', 'smoke', 'emergency', 'danger', 'threat', 'violence',
   'eve teasing', 'harassment', 'ragging', 'theft', 'stolen',
-  'injured', 'accident', 'ambulance', 'medical', 'sos',
+  'injured', 'accident', 'ambulance', 'medical emergency', 'sos',
   'attacked', 'blood', 'unconscious', 'faint', 'poisoning',
 ];
 
