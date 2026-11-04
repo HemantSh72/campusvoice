@@ -245,6 +245,7 @@ export default function App() {
           </div>
           {lastUpdated && <p className="muted-small">Updated {lastUpdated.toLocaleTimeString()}</p>}
           {dashboardError && <div className="error-banner mt-1" role="alert">{dashboardError}</div>}
+          <div className="ticket-table-head" aria-hidden="true"><span>Ticket</span><span>Issue and routing</span><span>Action</span></div>
           <div className="tickets-list mt-2">
             {tickets.length === 0 ? <p className="tickets-empty">No tickets yet. Report an issue to create the first one.</p> : tickets.map((ticket) => (
               <article className={'ticket-row priority-' + ticket.priority + (ticket.status === 'resolved' ? ' resolved' : '')} key={ticket.ticketNumber}>
