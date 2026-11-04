@@ -20,7 +20,17 @@ function loadEnv() {
 loadEnv();
 
 const pass = (name, detail = '') => console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
-const fail = (name, error) => console.log(`FAIL  ${name} — ${error?.message || String(error)}`);
+const fail = (name, error) => {
+  let reason = error?.message || String(error);
+  for (const key of ['GEMINI_API_KEY', 'TELEGRAM_BOT_TOKEN', 'MONGODB_URI', 'ADMIN_PIN']) {
+    const secret = process.env[key];
+    if (secret) reason = reason.split(secret).join('[redacted]');
+  }
+  reason = reason.replace(/bot\\d+:[A-Za-z0-9_-]+/g, 'bot[redacted]')
+    .replace(/key=[^&\\s]+/gi, 'key=[redacted]')
+    .replace(/mongodb(?:\\+srv)?:\\/\\/[^\\s]+/gi, 'mongodb://[redacted]');
+  console.log(`FAIL  ${name} — ${reason.slice(0, 180)}`);
+};
 const skip = (name, reason) => console.log(`SKIPPED  ${name} — ${reason}`);
 
 async function geminiCheck(model, key) {
