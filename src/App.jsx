@@ -46,7 +46,7 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const pendingRequest = useRef(null);
   const speech = useSpeechRecognition();
-  const tts = useTTS();
+  const { supported: ttsSupported, speaking: ttsSpeaking, speak, stop: stopTTS } = useTTS();
 
   const submitTranscript = useCallback(async (value) => {
     const clean = String(value || '').trim();
@@ -84,7 +84,7 @@ export default function App() {
       setLastTicket(data.ticket || null);
       setFailedTranscript('');
       pendingRequest.current = null;
-      await tts.speak(spokenReply, 'en-IN');
+      await speak(spokenReply, 'en-IN');
       if (data.awaiting) setAutoListen(true);
     } catch (error) {
       const friendly = error.name === 'AbortError'
@@ -97,10 +97,10 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [busy, draft, lang, tts]);
+  }, [busy, draft, lang, speak]);
 
   useEffect(() => {
-    if (!autoListen || busy || tts.speaking || !speech.supported) return;
+    if (!autoListen || busy || ttsSpeaking || !speech.supported) return;
     setAutoListen(false);
     speech.start(lang, submitTranscript);
   }, [autoListen, busy, tts.speaking, speech.supported, speech.start, lang, submitTranscript]);
@@ -110,11 +110,11 @@ export default function App() {
     const friendly = FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed. Please try again or type your complaint.';
     setReply(friendly);
     tts.speak(friendly, 'en-IN');
-  }, [speech.error, tts]);
+  }, [speech.error, speak]);
 
   const startListening = () => {
     if (busy || tts.speaking) return;
-    tts.stop();
+    stopTTS();
     speech.start(lang, submitTranscript);
   };
   const submitTyped = (event) => {
@@ -231,7 +231,7 @@ export default function App() {
             <button className="stop-button" type="button" onClick={() => { speech.stop(); tts.stop(); setAutoListen(false); }}>Stop</button>
           )}
           {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
-          {!tts.supported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
+          {!ttsSupported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
           {speech.error && speech.error !== 'aborted' && <div className="warning-banner" role="status">{FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed.'}</div>}
           <div className="transcript-display" aria-live="polite">
             {message && <p className="transcript-final">You said: {message}</p>}
