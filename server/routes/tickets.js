@@ -1,27 +1,39 @@
-/**
- * Public ticket listing and PIN-protected resolution endpoint.
- */
 import { Router } from 'express';
-import { comparePin } from '../validate.js';
 import { getTickets, resolveTicket } from '../services/tickets.js';
+import { comparePin } from '../validate.js';
+import { checkRateLimit, getClientIp } from '../services/rateLimit.js';
 import config from '../config.js';
 
 const router = Router();
-
-router.get('/', async (req, res, next) => {
-  try { res.json({ tickets: await getTickets() }); }
-  catch (error) { next(error); }
-});
-
-router.post('/:ticketNumber/resolve', async (req, res, next) => {
+router.get('/', async (req, res) => {
   try {
-    if (!config.adminPin) return res.status(503).json({ error: 'Ticket resolution is disabled because the admin PIN is not configured.' });
-    const submitted = req.headers['x-admin-pin'];
-    if (!comparePin(submitted, config.adminPin)) return res.status(401).json({ error: 'Invalid or missing admin PIN.' });
-    const ticket = await resolveTicket(req.params.ticketNumber);
-    if (!ticket) return res.status(404).json({ error: `Ticket ${req.params.ticketNumber} was not found.` });
-    res.json({ success: true, ticket });
-  } catch (error) { next(error); }
+    const tickets = await getTickets();
+    return res.json({ tickets });
+  } catch (error) {
+    console.error('[tickets] list failed:', error.message);
+    return res.status(config.isProduction ? 503 : 500).json({
+      error: config.isProduction ? 'Ticket database is temporarily unavailable.' : 'Could not load tickets.',
+    });
+  }
 });
 
+router.post('/:ticketNumber/resolve', async (req, res) => {
+  try {
+    if (!config.adminPin) return res.status(503).json({ error: 'Ticket resolution is disabled because ADMIN_PIN is not configured.' });
+    const limit = await checkRateLimit(getClientIp(req));
+    if (!limit.allowed) return res.status(429).json({ error: limit.message });
+    const submitted = req.headers['x-admin-pin'];
+    if (!comparePin(submitted, config.adminPin)) return res.status(401).json({ error: 'Invalid PIN.' });
+    const number = Number.parseInt(req.params.ticketNumber, 10);
+    if (!Number.isSafeInteger(number) || number < 1) return res.status(400).json({ error: 'Invalid ticket number.' });
+    const ticket = await resolveTicket(number);
+    if (!ticket) return res.status(404).json({ error: 'Ticket ' + number + ' was not found.' });
+    return res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('[tickets] resolve failed:', error.message);
+    return res.status(config.isProduction ? 503 : 500).json({
+      error: config.isProduction ? 'Ticket database is temporarily unavailable.' : 'Could not resolve this ticket.',
+    });
+  }
+});
 export default router;
