@@ -51,15 +51,43 @@ let indexesPromise;
 async function ensureIndexes(db) {
   if (!indexesPromise) {
     indexesPromise = (async () => {
-      await Promise.all([
-        db.collection('tickets').createIndex({ ticketNumber: 1 }, { unique: true }),
-        db.collection('tickets').createIndex(
+      const tickets = db.collection('tickets');
+      const ticketIndexes = await tickets.listIndexes().toArray();
+      const requestIndex = ticketIndexes.find((index) => index.key?.requestId === 1);
+      if (requestIndex?.unique && requestIndex.sparse) {
+        // Older versions stored requestId:null; sparse unique indexes still index null.
+        await tickets.updateMany({ requestId: null }, { $unset: { requestId: '' } });
+      } else if (requestIndex && !requestIndex.unique) {
+        await tickets.dropIndex(requestIndex.name);
+      } else if (requestIndex?.unique && !requestIndex.partialFilterExpression) {
+        await tickets.updateMany({ requestId: null }, { $unset: { requestId: '' } });
+        await tickets.dropIndex(requestIndex.name);
+      }
+      const currentTicketIndexes = await tickets.listIndexes().toArray();
+      if (!currentTicketIndexes.some((index) => index.key?.requestId === 1 && index.unique)) {
+        await tickets.createIndex(
           { requestId: 1 },
           { unique: true, partialFilterExpression: { requestId: { $type: 'string' } }, name: 'requestId_unique_string' },
-        ),
-        db.collection('tickets').createIndex({ createdAt: -1 }),
-        db.collection('rateLimits').createIndex({ key: 1 }, { unique: true, name: 'rate_limit_key_unique' }),
-        db.collection('rateLimits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+        );
+      }
+
+      const rateLimits = db.collection('rateLimits');
+      const rateIndexes = await rateLimits.listIndexes().toArray();
+      const keyIndex = rateIndexes.find((index) => index.key?.key === 1);
+      if (keyIndex && !keyIndex.unique) {
+        // Old non-unique counters can be discarded; each new request uses a unique fixed-window key.
+        await rateLimits.deleteMany({});
+        await rateLimits.dropIndex(keyIndex.name);
+      }
+      const currentRateIndexes = await rateLimits.listIndexes().toArray();
+      if (!currentRateIndexes.some((index) => index.key?.key === 1 && index.unique)) {
+        await rateLimits.createIndex({ key: 1 }, { unique: true, name: 'rate_limit_key_unique' });
+      }
+
+      await Promise.all([
+        tickets.createIndex({ ticketNumber: 1 }, { unique: true }),
+        tickets.createIndex({ createdAt: -1 }),
+        rateLimits.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
         db.collection('llmState').createIndex({ dailyDate: 1 }),
         db.collection('llmUsage').createIndex({ model: 1, dateKey: 1 }, { unique: true }),
         db.collection('llmBreakers').createIndex({ model: 1 }, { unique: true }),
@@ -71,7 +99,6 @@ async function ensureIndexes(db) {
   }
   return indexesPromise;
 }
-
 export async function getDB() {
   if (!config.mongoUri) {
     if (config.isProduction) throw new Error('Production database unavailable: MONGODB_URI is required.');
