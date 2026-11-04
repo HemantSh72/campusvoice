@@ -8,208 +8,176 @@ const EXAMPLES = [
   'The campus bus is always late',
   'What is the status of ticket 7?',
 ];
-const friendlySpeechErrors = {
-  unsupported: 'Voice recognition is not supported here. You can type your message below.',
-  'not-allowed': 'Microphone permission was denied. Allow microphone access in your browser settings, then try again.',
-  'service-not-allowed': 'This browser or page is not allowed to use the microphone. Use typed input instead.',
-  'no-speech': 'I did not hear anything. Please try speaking again.',
-  'audio-capture': 'No microphone was detected. Connect or enable a microphone, or type your message.',
-  network: 'The browser speech service had a network problem. Please try again or type your message.',
+const FRIENDLY_SPEECH_ERRORS = {
+  'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings, or type your complaint below.',
+  'service-not-allowed': 'This browser does not allow speech recognition here. You can type your complaint below.',
+  'no-speech': 'I did not hear anything. Please try speaking again, or type your complaint.',
+  'audio-capture': 'I could not find an available microphone. Check your microphone connection or type your complaint.',
+  network: 'Speech recognition could not connect. Check your internet connection or type your complaint.',
   aborted: 'Voice input was stopped.',
-  'start-failed': 'The microphone could not be started. Check browser permissions and try again.',
+  'start-failed': 'I could not start the microphone. Check browser permissions or type your complaint.',
 };
 
-async function fetchJson(url, options = {}, timeout = 12_000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const error = new Error(data.error || `Request failed with status ${response.status}`);
-      error.status = response.status;
-      throw error;
-    }
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
+function newRequestId() {
+  return globalThis.crypto?.randomUUID?.()
+    || 'cv-' + Date.now() + '-' + Math.random().toString(16).slice(2);
 }
-
 function statusClass(value) {
-  if (['mongo', 'configured', 'supported', 'ok'].includes(value)) return 'ok';
+  if (['mongo', 'configured', 'sent', 'supported'].includes(value)) return 'ok';
   if (['down', 'failed', 'unsupported'].includes(value)) return 'down';
   return 'warn';
-}
-
-function StatusBadge({ label, value, detail }) {
-  return <span className={`status-badge ${statusClass(value)}`} title={detail || value}>
-    <span className="status-dot" />{label}: {detail || value}
-  </span>;
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 }
 
 export default function App() {
   const [lang, setLang] = useState('en-IN');
   const [draft, setDraft] = useState({});
-  const [reply, setReply] = useState('Tap the microphone or type below to report a campus issue. You can also ask for a ticket status.');
   const [typed, setTyped] = useState('');
-  const [lastTranscript, setLastTranscript] = useState('');
+  const [message, setMessage] = useState('');
+  const [reply, setReply] = useState('Tap the microphone and describe your campus issue. You can also type below.');
   const [busy, setBusy] = useState(false);
   const [awaiting, setAwaiting] = useState(false);
+  const [autoListen, setAutoListen] = useState(false);
   const [lastTicket, setLastTicket] = useState(null);
-  const [error, setError] = useState('');
+  const [failedTranscript, setFailedTranscript] = useState('');
+  const [apiError, setApiError] = useState('');
   const [health, setHealth] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [dashboardError, setDashboardError] = useState('');
-  const [retryPayload, setRetryPayload] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const pendingRequest = useRef(null);
   const speech = useSpeechRecognition();
   const tts = useTTS();
-  const submitRef = useRef(null);
-  const hiddenRef = useRef(false);
 
-  const speakReply = useCallback(async (text) => {
-    if (tts.supported) await tts.speak(text, 'en-IN');
-  }, [tts]);
-
-  const submitTranscript = useCallback(async (transcript, reuseRequestId = null) => {
-    const clean = String(transcript || '').trim();
+  const submitTranscript = useCallback(async (value) => {
+    const clean = String(value || '').trim();
     if (!clean || busy) return;
-    speech.stop();
-    tts.stop();
+    if (!pendingRequest.current || pendingRequest.current.transcript !== clean) {
+      pendingRequest.current = { transcript: clean, requestId: newRequestId() };
+    }
+    const requestId = pendingRequest.current.requestId;
     setBusy(true);
-    setError('');
-    setLastTranscript(clean);
-    const requestId = reuseRequestId || globalThis.crypto?.randomUUID?.() || `cv-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const payload = { transcript: clean, draft, lang, requestId };
-    setRetryPayload(payload);
-    let shouldListenAgain = false;
+    setMessage(clean);
+    setApiError('');
+    setAutoListen(false);
     try {
-      const data = await fetchJson('/api/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      setReply(data.reply || 'Your request was processed.');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      let response;
+      try {
+        response = await fetch('/api/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: clean, draft, requestId, lang }),
+          signal: controller.signal,
+        });
+      } finally { clearTimeout(timeout); }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 429) throw new Error(data.error || 'Too many requests. Please wait and try again.');
+        if (response.status >= 500) throw new Error(data.error || 'CampusVoice is temporarily unavailable. Please try again shortly.');
+        throw new Error(data.error || 'Your message could not be processed. Please try again.');
+      }
+      const spokenReply = data.reply || 'Your request was processed.';
+      setReply(spokenReply);
       setDraft(data.draft || {});
       setAwaiting(Boolean(data.awaiting));
       setLastTicket(data.ticket || null);
-      setRetryPayload(null);
-      shouldListenAgain = Boolean(data.awaiting && speech.supported);
-      await speakReply(data.reply || 'Your request was processed.');
-    } catch (cause) {
-      let message;
-      if (cause.name === 'AbortError') message = 'The request took too long. Check your connection and retry.';
-      else if (cause.status === 429) message = cause.message || 'Too many requests. Please wait before trying again.';
-      else if (cause.status >= 500) message = cause.message || 'CampusVoice is temporarily unavailable. Please try again shortly.';
-      else if (cause.status) message = cause.message;
-      else message = 'Could not connect to CampusVoice. Check your internet connection and retry.';
-      setError(message);
-      setReply(message);
-      await speakReply(message);
+      setFailedTranscript('');
+      pendingRequest.current = null;
+      await tts.speak(spokenReply, 'en-IN');
+      if (data.awaiting) setAutoListen(true);
+    } catch (error) {
+      const friendly = error.name === 'AbortError'
+        ? 'The request took too long. Check your connection and retry.'
+        : (error.message || 'Could not reach CampusVoice. Please try again.');
+      setApiError(friendly);
+      setReply(friendly);
+      setFailedTranscript(clean);
+      await tts.speak(friendly, 'en-IN');
     } finally {
       setBusy(false);
-      setTyped('');
     }
-    if (shouldListenAgain && !hiddenRef.current) {
-      speech.start(lang, (nextText) => submitRef.current?.(nextText));
-    }
-  }, [busy, draft, lang, speech, tts, speakReply]);
+  }, [busy, draft, lang, tts]);
 
-  useEffect(() => { submitRef.current = submitTranscript; }, [submitTranscript]);
+  useEffect(() => {
+    if (!autoListen || busy || tts.speaking || !speech.supported) return;
+    setAutoListen(false);
+    speech.start(lang, submitTranscript);
+  }, [autoListen, busy, tts.speaking, speech.supported, speech.start, lang, submitTranscript]);
+
+  useEffect(() => {
+    if (!speech.error || speech.error === 'aborted') return;
+    const friendly = FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed. Please try again or type your complaint.';
+    setReply(friendly);
+    tts.speak(friendly, 'en-IN');
+  }, [speech.error, tts]);
 
   const startListening = () => {
-    if (busy || tts.speaking || !speech.supported) return;
+    if (busy || tts.speaking) return;
     tts.stop();
-    setError('');
-    speech.start(lang, (text) => submitRef.current?.(text));
+    speech.start(lang, submitTranscript);
   };
-
-  const stopAll = () => {
-    speech.stop();
-    tts.stop();
-  };
-
   const submitTyped = (event) => {
     event.preventDefault();
-    submitTranscript(typed);
-  };
-
-  const retry = () => {
-    if (retryPayload) submitTranscript(retryPayload.transcript, retryPayload.requestId);
+    if (typed.trim()) submitTranscript(typed);
+    setTyped('');
   };
 
   const loadHealth = useCallback(async () => {
     try {
-      const data = await fetchJson('/api/health', {}, 5000);
-      setHealth(data);
-    } catch {
-      setHealth({ ok: false, db: 'down', llm: 'unknown', telegram: 'unknown' });
-    }
+      const response = await fetch('/api/health', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Health check unavailable');
+      setHealth(await response.json());
+    } catch { setHealth({ ok: false, db: 'down', llm: 'unknown', telegram: 'unknown' }); }
   }, []);
-
   const loadTickets = useCallback(async () => {
     try {
-      const data = await fetchJson('/api/tickets', {}, 7000);
-      setTickets(data.tickets || []);
+      const response = await fetch('/api/tickets', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Ticket dashboard unavailable');
+      const data = await response.json();
+      setTickets(Array.isArray(data.tickets) ? data.tickets : []);
       setDashboardError('');
-    } catch {
-      setDashboardError('Ticket dashboard is temporarily unavailable.');
-    }
+      setLastUpdated(new Date());
+    } catch (error) { setDashboardError(error.message || 'Could not load tickets.'); }
   }, []);
 
   useEffect(() => {
     loadHealth();
     loadTickets();
-    const healthTimer = setInterval(loadHealth, 30_000);
-    const ticketTimer = setInterval(() => {
-      if (!document.hidden) loadTickets();
-    }, 5000);
-    const onVisibility = () => {
-      hiddenRef.current = document.hidden;
-      if (!document.hidden) { loadHealth(); loadTickets(); }
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        loadHealth();
+        loadTickets();
+      }
     };
-    document.addEventListener('visibilitychange', onVisibility);
+    const interval = setInterval(refresh, 5000);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
-      clearInterval(healthTimer);
-      clearInterval(ticketTimer);
-      document.removeEventListener('visibilitychange', onVisibility);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refresh);
     };
   }, [loadHealth, loadTickets]);
 
   const resolve = async (ticketNumber) => {
-    const pin = window.prompt(`Enter admin PIN to resolve ticket #${ticketNumber}:`);
+    const pin = window.prompt('Enter admin PIN to resolve ticket #' + ticketNumber);
     if (pin === null) return;
+    if (!pin.trim()) { setDashboardError('Admin PIN cannot be empty.'); return; }
     try {
-      await fetchJson(`/api/tickets/${ticketNumber}/resolve`, {
+      const response = await fetch('/api/tickets/' + ticketNumber + '/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-pin': pin },
         body: '{}',
       });
-      setReply(`Ticket ${ticketNumber} has been marked resolved.`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not resolve ticket.');
       await loadTickets();
-    } catch (cause) {
-      const message = cause.status === 401 ? 'The admin PIN is incorrect.' : cause.message || 'Could not resolve this ticket.';
-      setError(message);
-      setReply(message);
-      await speakReply(message);
-    }
+    } catch (error) { setDashboardError(error.message || 'Could not resolve ticket.'); }
   };
 
-  const statusText = busy ? 'Thinking…'
-    : speech.listening ? 'Listening — speak now'
-    : tts.speaking ? 'Speaking response…'
-    : error ? 'Needs attention'
-    : 'Ready when you are';
-
-  const dbValue = health?.db || 'checking';
-  const llmValue = health?.llm || 'checking';
-  const telegramValue = health?.telegram || 'checking';
+  const aiLabel = health?.llm === 'configured' ? 'Gemini configured' : 'Rule-based fallback';
+  const dbLabel = health?.db || 'checking';
+  const telegramLabel = health?.telegram === 'configured' ? 'Telegram configured' : 'Telegram not configured';
+  const telegramUrl = import.meta.env.VITE_TELEGRAM_CHANNEL_URL;
 
   return (
     <div className="app">
@@ -220,107 +188,127 @@ export default function App() {
 
       <main className="app-main">
         <section className="card" aria-label="System status">
-          <h2 className="card-title">Live system status</h2>
-          <div className="status-strip">
-            <StatusBadge label="Microphone" value={speech.supported ? 'supported' : 'unsupported'} detail={speech.supported ? 'Browser voice ready' : 'Use typed input'} />
-            <StatusBadge label="AI" value={llmValue} detail={llmValue === 'configured' ? 'Gemini model chain' : 'Rules fallback'} />
-            <StatusBadge label="Database" value={dbValue} detail={dbValue === 'mongo' ? 'MongoDB connected' : dbValue === 'memory' ? 'Local memory only' : dbValue === 'down' ? 'Database unavailable' : 'Checking'} />
-            <StatusBadge label="Telegram" value={telegramValue} detail={telegramValue === 'configured' ? 'Alerts configured' : 'Alerts not configured'} />
+          <h2 className="card-title">System status</h2>
+          <div className="status-strip" aria-live="polite">
+            <span className={'status-badge ' + statusClass(speech.supported ? 'supported' : 'unsupported')}>
+              <span className="status-dot" /> Mic {speech.supported ? 'supported in this browser' : 'not supported'}
+            </span>
+            <span className={'status-badge ' + statusClass(health?.llm === 'configured' ? 'configured' : 'fallback')}>
+              <span className="status-dot" /> {aiLabel}
+            </span>
+            <span className={'status-badge ' + statusClass(dbLabel)}>
+              <span className="status-dot" /> Database: {dbLabel}
+            </span>
+            <span className={'status-badge ' + statusClass(health?.telegram === 'configured' ? 'configured' : 'not_configured')}>
+              <span className="status-dot" /> {telegramLabel}
+            </span>
           </div>
-          {health?.modelChain && <p className="status-detail mt-1">Model chain: {Object.entries(health.modelChain).map(([name, state]) => `${name}: ${state.reason}`).join(' · ')}</p>}
+          {health?.modelChain?.length > 0 && (
+            <p className="muted-small mt-1">Model chain: {health.modelChain.map((model) => model.model + ' (' + model.status + ')').join(' → ')}</p>
+          )}
         </section>
 
         <section className="card mic-section" aria-label="Voice complaint">
           <div className="lang-toggle" aria-label="Speech language">
-            <span>Recognition language</span>
+            <span>Speak in</span>
             <button className={lang === 'en-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('en-IN')} type="button">English</button>
             <button className={lang === 'hi-IN' ? 'lang-btn active' : 'lang-btn'} onClick={() => setLang('hi-IN')} type="button">हिन्दी</button>
           </div>
           <div className="mic-button-wrap">
-            <div className={`mic-ring ${speech.listening ? 'listening' : tts.speaking ? 'speaking' : ''}`} />
+            <div className={'mic-ring ' + (speech.listening ? 'listening' : tts.speaking ? 'speaking' : '')} />
             <button
-              className={`mic-button ${speech.listening ? 'listening' : busy ? 'thinking' : tts.speaking ? 'speaking' : error ? 'error' : 'idle'}`}
+              className={'mic-button ' + (speech.listening ? 'listening' : busy ? 'thinking' : tts.speaking ? 'speaking' : 'idle')}
               type="button"
-              onClick={speech.listening || tts.speaking ? stopAll : startListening}
-              disabled={busy || (!speech.supported && !tts.speaking)}
-              aria-label={speech.listening || tts.speaking ? 'Stop' : 'Start voice input'}
-            >{speech.listening || tts.speaking ? '■' : '🎙️'}</button>
+              onClick={speech.listening ? speech.stop : startListening}
+              disabled={busy || tts.speaking || (!speech.supported && !speech.listening)}
+              aria-label={speech.listening ? 'Stop listening' : 'Start voice input'}
+            >{speech.listening ? '■' : busy ? '…' : '🎙️'}</button>
           </div>
-          <p className="mic-state-label" aria-live="polite">{statusText}</p>
-          {(speech.listening || tts.speaking) && <button className="stop-button" type="button" onClick={stopAll}>Stop</button>}
-          {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Type your message below. Voice replies may still work.</div>}
-          {speech.error && <div className="warning-banner" role="status">{friendlySpeechErrors[speech.error] || 'The microphone could not be used. Check permissions or type your message.'}</div>}
+          <p className="mic-state-label" aria-live="polite">
+            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : tts.speaking ? 'Speaking response…' : 'Ready when you are'}
+          </p>
+          {(speech.listening || tts.speaking) && (
+            <button className="stop-button" type="button" onClick={() => { speech.stop(); tts.stop(); setAutoListen(false); }}>Stop</button>
+          )}
+          {!speech.supported && <div className="unsupported-banner">Voice recognition is unavailable in this browser. Use the typed input below or open this page in Chrome. Voice output may still work.</div>}
+          {!tts.supported && <div className="warning-banner">Voice output is not supported in this browser. Replies will appear as text.</div>}
+          {speech.error && speech.error !== 'aborted' && <div className="warning-banner" role="status">{FRIENDLY_SPEECH_ERRORS[speech.error] || 'Microphone input failed.'}</div>}
           <div className="transcript-display" aria-live="polite">
-            {lastTranscript && <p className="transcript-final">You said: {lastTranscript}</p>}
+            {message && <p className="transcript-final">You said: {message}</p>}
             {speech.interimTranscript && <p className="transcript-interim">{speech.interimTranscript}</p>}
           </div>
+          {awaiting && <p className="warning-banner">One more detail needed: tell me the location. The microphone will listen again after this question.</p>}
         </section>
 
-        {(draft.summary || awaiting) && <section className="card">
-          <h2 className="card-title">Ticket draft</h2>
-          <div className="draft-card">
-            <div className="draft-field"><label>Issue summary</label><value>{draft.summary || 'Waiting for issue description'}</value></div>
-            <div className="draft-field"><label>Location</label><value className={!draft.location ? 'empty' : ''}>{draft.location || 'Please provide the location'}</value></div>
-            <div className="draft-field"><label>Department</label><value>{draft.category || 'To be determined'}</value></div>
-            <div className="draft-field"><label>Priority</label><value>{draft.priority || 'To be determined'}</value></div>
-          </div>
-        </section>}
-
         <section className="card">
-          <h2 className="card-title">Assistant reply</h2>
+          <h2 className="card-title">Assistant</h2>
           <div className="reply-bubble" aria-live="polite"><span className="reply-icon">💬</span><p>{reply}</p></div>
-          {lastTicket && <div className="draft-card mt-2">
-            <div className="draft-field"><label>Ticket number</label><value>#{lastTicket.ticketNumber}</value></div>
-            <div className="draft-field"><label>Status</label><value>{lastTicket.status || 'open'}</value></div>
-            <div className="draft-field"><label>Department</label><value>{lastTicket.department}</value></div>
-            <div className="draft-field"><label>Priority / SLA</label><value>{lastTicket.priority} · {lastTicket.slaHours}h</value></div>
-          </div>}
+          {lastTicket && (
+            <div className="draft-card mt-2">
+              <div className="draft-field"><label>Ticket</label><value>#{lastTicket.ticketNumber}</value></div>
+              <div className="draft-field"><label>Status</label><value>{lastTicket.status || 'open'}</value></div>
+              <div className="draft-field"><label>Department</label><value>{lastTicket.department}</value></div>
+              <div className="draft-field"><label>Priority / SLA</label><value>{lastTicket.priority} · {lastTicket.slaHours}h</value></div>
+              <div className="draft-field"><label>Location</label><value>{lastTicket.location}</value></div>
+              <div className="draft-field"><label>Telegram</label><value>{lastTicket.telegramStatus}</value></div>
+            </div>
+          )}
+          {draft.summary && awaiting && (
+            <div className="draft-card mt-2">
+              <div className="draft-field"><label>Draft summary</label><value>{draft.summary}</value></div>
+              <div className="draft-field"><label>Location</label><value>{draft.location || 'Waiting for location'}</value></div>
+            </div>
+          )}
         </section>
 
         <section className="card">
-          <h2 className="card-title">Type a complaint or status question</h2>
+          <h2 className="card-title">Or type your message</h2>
           <form className="typed-input-wrap" onSubmit={submitTyped}>
-            <input className="typed-input" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder="e.g. WiFi is down in block A…" aria-label="Type your message" />
+            <input className="typed-input" value={typed} onChange={(event) => setTyped(event.target.value)} placeholder="e.g. WiFi is down in block A…" aria-label="Type a complaint or ticket status query" />
             <button className="send-btn" type="submit" disabled={!typed.trim() || busy}>Send</button>
           </form>
-          {error && <div className="error-banner mt-2" role="alert">{error}{retryPayload && <button className="retry-btn" type="button" onClick={retry}>Retry same request</button>}</div>}
-          <h3 className="card-title mt-2">Try saying (or tap to submit)</h3>
-          <div className="chips-wrap">{EXAMPLES.map((example) => <button className="chip" type="button" key={example} disabled={busy} onClick={() => submitTranscript(example)}>{example}</button>)}</div>
+          <p className="muted-small mt-1">Try saying — tap an example to submit it as text:</p>
+          <div className="chips-wrap mt-1">
+            {EXAMPLES.map((example) => <button className="chip" type="button" key={example} disabled={busy} onClick={() => submitTranscript(example)}>{example}</button>)}
+          </div>
+          {apiError && <div className="error-banner mt-2" role="alert">{apiError}</div>}
+          {failedTranscript && <button className="send-btn mt-2" type="button" onClick={() => submitTranscript(failedTranscript)} disabled={busy}>Retry same request</button>}
         </section>
 
-        <section className="card" aria-label="Ticket dashboard">
+        <section className="card">
           <div className="dashboard-header">
-            <h2 className="card-title">Live ticket dashboard</h2>
+            <div><h2 className="card-title">Live ticket dashboard</h2><p className="muted-small">Latest 30 tickets · refreshes every 5 seconds</p></div>
             <div className="dashboard-actions">
-              <button className="stop-button" type="button" onClick={loadTickets}>Refresh</button>
-              {import.meta.env.VITE_TELEGRAM_CHANNEL_URL && <a className="tg-btn" href={import.meta.env.VITE_TELEGRAM_CHANNEL_URL} target="_blank" rel="noreferrer">Watch live alerts ↗</a>}
+              {telegramUrl && <a className="tg-btn" href={telegramUrl} target="_blank" rel="noreferrer">↗ Watch live alerts</a>}
+              <button className="chip" type="button" onClick={loadTickets}>Refresh</button>
             </div>
           </div>
-          {dashboardError && <div className="warning-banner">{dashboardError}</div>}
-          {!tickets.length && !dashboardError ? <p className="tickets-empty">No tickets yet. Report an issue to create the first ticket.</p> : <div className="tickets-list">
-            {tickets.map((ticket) => <article className={`ticket-row priority-${ticket.priority} ${ticket.status === 'resolved' ? 'resolved' : ''}`} key={ticket.ticketNumber}>
-              <div className="ticket-num">#{ticket.ticketNumber}</div>
-              <div className="ticket-body">
-                <p className="ticket-summary">{ticket.summary}</p>
-                <div className="ticket-meta">
-                  <span className="ticket-tag">{ticket.department}</span>
-                  <span className="ticket-tag">{ticket.location}</span>
-                  <span className={`ticket-tag priority-${ticket.priority}`}>{ticket.priority}</span>
-                  <span className="ticket-tag">{ticket.slaHours}h SLA</span>
-                  <span className={`ticket-tag ${ticket.telegramStatus === 'sent' ? 'tg-sent' : ticket.telegramStatus === 'failed' ? 'tg-failed' : 'tg-nc'}`}>Telegram: {ticket.telegramStatus || 'unknown'}</span>
-                  <span className="ticket-tag">{formatDate(ticket.createdAt)}</span>
+          {lastUpdated && <p className="muted-small">Updated {lastUpdated.toLocaleTimeString()}</p>}
+          {dashboardError && <div className="error-banner mt-1" role="alert">{dashboardError}</div>}
+          <div className="tickets-list mt-2">
+            {tickets.length === 0 ? <p className="tickets-empty">No tickets yet. Report an issue to create the first one.</p> : tickets.map((ticket) => (
+              <article className={'ticket-row priority-' + ticket.priority + (ticket.status === 'resolved' ? ' resolved' : '')} key={ticket.ticketNumber}>
+                <div className="ticket-num">#{ticket.ticketNumber}</div>
+                <div className="ticket-body">
+                  <p className="ticket-summary">{ticket.summary}</p>
+                  <div className="ticket-meta">
+                    <span className="ticket-tag">{ticket.department}</span>
+                    <span className="ticket-tag">{ticket.location}</span>
+                    <span className={'ticket-tag priority-' + ticket.priority}>{ticket.priority}</span>
+                    <span className="ticket-tag">{ticket.slaHours}h SLA</span>
+                    <span className={'ticket-tag ' + (ticket.telegramStatus === 'sent' ? 'tg-sent' : ticket.telegramStatus === 'failed' ? 'tg-failed' : 'tg-nc')}>Alert: {ticket.telegramStatus}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="ticket-actions">
-                {ticket.status === 'resolved' ? <span className="resolved-badge">Resolved</span> : <button className="resolve-btn" type="button" onClick={() => resolve(ticket.ticketNumber)} disabled={health?.adminPin === 'not_configured'}>Resolve</button>}
-              </div>
-            </article>)}
-          </div>}
+                <div className="ticket-actions">
+                  {ticket.status === 'resolved' ? <span className="resolved-badge">Resolved</span> : <button className="resolve-btn" type="button" onClick={() => resolve(ticket.ticketNumber)}>Resolve</button>}
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       </main>
-
       <footer className="app-footer">
-        Speech recognition and voice replies run in your browser. Ticket creation uses the CampusVoice API; Gemini, MongoDB and Telegram are real integrations only when their status is configured. Without credentials, local development uses rule-based parsing and memory storage. This demo is not for emergencies.
+        Speech recognition and speech output run in your browser. Tickets are stored in the configured database; local development without MongoDB uses temporary memory only. Gemini and Telegram are real integrations only when configured. This demo is not an emergency service.
       </footer>
     </div>
   );
