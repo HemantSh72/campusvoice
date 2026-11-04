@@ -32,7 +32,7 @@ jobs:
           DEV_PID=$!
           trap 'kill -TERM "$DEV_PID" 2>/dev/null || true; wait "$DEV_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:5000/api/health > /tmp/campusvoice-health.json && curl -fsS http://localhost:3000/ > /dev/null; then
+            if curl -fsS http://localhost:5000/api/health 2>/dev/null > /tmp/campusvoice-health.json && curl -fsS http://localhost:3000/ 2>/dev/null > /dev/null; then
               node -e "const h=require('/tmp/campusvoice-health.json'); if (!h.ok || h.db !== 'memory') process.exit(1);"
               exit 0
             fi
