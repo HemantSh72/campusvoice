@@ -15,7 +15,7 @@ async function nextTicketNumber({ db, mem }) {
   const result = await db.collection('counters').findOneAndUpdate(
     { _id: 'ticketNumber' },
     { $inc: { seq: 1 } },
-    { upsert: true, returnDocument: 'after' },
+    { upsert: true, returnDocument: 'after', includeResultMetadata: false },
   );
   return result?.seq ?? result?.value?.seq;
 }
@@ -101,7 +101,7 @@ export async function resolveTicket(ticketNumber) {
   const result = await db.collection('tickets').findOneAndUpdate(
     { ticketNumber: number },
     { $set: { status: 'resolved', resolvedAt: new Date() } },
-    { returnDocument: 'after', projection: PUBLIC_FIELDS },
+    { returnDocument: 'after', projection: PUBLIC_FIELDS, includeResultMetadata: false },
   );
   return result?.value ?? result ?? null;
 }
