@@ -19,8 +19,11 @@ const FRIENDLY_SPEECH_ERRORS = {
 };
 
 function newRequestId() {
-  return globalThis.crypto?.randomUUID?.()
-    || 'cv-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    return (char === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+  });
 }
 function statusClass(value) {
   if (['mongo', 'configured', 'sent', 'supported'].includes(value)) return 'ok';
@@ -55,6 +58,8 @@ export default function App() {
       pendingRequest.current = { transcript: clean, requestId: newRequestId() };
     }
     const requestId = pendingRequest.current.requestId;
+    speech.stop();
+    stopTTS();
     setBusy(true);
     setMessage(clean);
     setApiError('');
@@ -97,7 +102,7 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [busy, draft, lang, speak]);
+  }, [busy, draft, lang, speak, speech.stop, stopTTS]);
 
   useEffect(() => {
     if (!autoListen || busy || ttsSpeaking || !speech.supported) return;
@@ -225,7 +230,7 @@ export default function App() {
             >{speech.listening ? '■' : busy ? '…' : '🎙️'}</button>
           </div>
           <p className="mic-state-label" aria-live="polite">
-            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : 'Ready when you are'}
+            {busy ? 'Processing your request…' : speech.listening ? 'Listening — speak now' : ttsSpeaking ? 'Speaking response…' : speech.error ? 'Microphone error — see guidance below' : 'Ready when you are'}
           </p>
           {(speech.listening || ttsSpeaking) && (
             <button className="stop-button" type="button" onClick={() => { speech.stop(); stopTTS(); setAutoListen(false); }}>Stop</button>
