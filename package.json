@@ -7,8 +7,8 @@
     "dev": "concurrently \"node --watch server/index.js\" \"vite --port 3000\"",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/fallbackParser.test.js tests/validators.test.js tests/api.integration.test.js",
-    "test:remote": "BASE_URL=$BASE_URL node --test tests/api.integration.test.js",
+    "test": "node --test tests/fallbackParser.test.js tests/validators.test.js tests/llmState.test.js tests/api.integration.test.js",
+    "test:remote": "node --test tests/api.integration.test.js",
     "seed": "node scripts/seed.js",
     "smoke": "node scripts/smoke.js"
   },
