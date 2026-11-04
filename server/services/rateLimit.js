@@ -36,14 +36,14 @@ export async function checkRateLimit(ip) {
         result = await col.findOneAndUpdate(
           { key: window.key },
           { $inc: { count: 1 }, $setOnInsert: { expiresAt: new Date(now + window.ttl) } },
-          { upsert: true, returnDocument: 'after' },
+          { upsert: true, returnDocument: 'after', includeResultMetadata: false },
         );
       } catch (error) {
         if (error.code !== 11000) throw error;
         result = await col.findOneAndUpdate(
           { key: window.key },
           { $inc: { count: 1 } },
-          { returnDocument: 'after' },
+          { returnDocument: 'after', includeResultMetadata: false },
         );
       }
       count = result?.count ?? result?.value?.count ?? 1;
