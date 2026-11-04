@@ -24,8 +24,8 @@ export async function modelIsBlocked(model) {
   const record = mem ? mem.llmBreakers.get(model) : await db.collection('llmBreakers').findOne({ model });
   if (!record?.blockedUntil) return false;
   if (new Date(record.blockedUntil).getTime() > Date.now()) return true;
-  if (mem) mem.llmBreakers.delete(model);
-  else await db.collection('llmBreakers').deleteOne({ model, blockedUntil: record.blockedUntil });
+  // Keep recent failure timestamps after the 60-second cooldown so three
+  // quota failures within ten minutes can trip the model for the UTC day.
   return false;
 }
 
