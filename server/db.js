@@ -40,11 +40,20 @@ async function connectMongo() {
 }
 
 let indexesPromise;
+async function listIndexesSafe(collection) {
+  try { return await collection.listIndexes().toArray(); }
+  catch (error) {
+    if (error.code === 26 || error.codeName === 'NamespaceNotFound') return [];
+    throw error;
+  }
+}
 async function ensureIndexes(db) {
   if (!indexesPromise) {
     indexesPromise = (async () => {
       const tickets = db.collection('tickets');
-      const ticketIndexes = await tickets.listIndexes().toArray();
+      // Missing fields are excluded by the sparse unique index; legacy nulls are not.
+      await tickets.updateMany({ requestId: null }, { $unset: { requestId: '' } });
+      const ticketIndexes = await listIndexesSafe(tickets);
       const requestIndex = ticketIndexes.find((index) => index.key?.requestId === 1);
       if (requestIndex?.unique && requestIndex.sparse) {
         // Older versions stored requestId:null; sparse unique indexes still index null.
@@ -55,7 +64,7 @@ async function ensureIndexes(db) {
         await tickets.updateMany({ requestId: null }, { $unset: { requestId: '' } });
         await tickets.dropIndex(requestIndex.name);
       }
-      const currentTicketIndexes = await tickets.listIndexes().toArray();
+      const currentTicketIndexes = await listIndexesSafe(tickets);
       if (!currentTicketIndexes.some((index) => index.key?.requestId === 1 && index.unique)) {
         await tickets.createIndex(
           { requestId: 1 },
@@ -64,14 +73,14 @@ async function ensureIndexes(db) {
       }
 
       const rateLimits = db.collection('rateLimits');
-      const rateIndexes = await rateLimits.listIndexes().toArray();
+      const rateIndexes = await listIndexesSafe(rateLimits);
       const keyIndex = rateIndexes.find((index) => index.key?.key === 1);
       if (keyIndex && !keyIndex.unique) {
         // Old non-unique counters can be discarded; each new request uses a unique fixed-window key.
         await rateLimits.deleteMany({});
         await rateLimits.dropIndex(keyIndex.name);
       }
-      const currentRateIndexes = await rateLimits.listIndexes().toArray();
+      const currentRateIndexes = await listIndexesSafe(rateLimits);
       if (!currentRateIndexes.some((index) => index.key?.key === 1 && index.unique)) {
         await rateLimits.createIndex({ key: 1 }, { unique: true, name: 'rate_limit_key_unique' });
       }
