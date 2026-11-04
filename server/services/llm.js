@@ -141,10 +141,36 @@ export async function parseWithLLM(transcript, draft = {}, lang = 'en-IN') {
           }
         } else throw error;
       }
-      if (parsed.intent === 'report_issue' && parsed.draft.summary && !parsed.draft.location) {
-        return { ...parsed, parsedBy: 'gemini', awaiting: true, reply: 'Where is this happening? Please tell me the block or area.' };
+      // Preserve the validated client draft and enforce the two-follow-up limit
+      // even when a long answer is sent to Gemini and the model misses its location.
+      if (draft.summary && !draft.location && !isStatusOrCancel(transcript)) {
+        const mergedDraft = { ...draft, ...parsed.draft };
+        if (mergedDraft.location) {
+          return { ...parsed, intent: 'report_issue', draft: mergedDraft, parsedBy: 'gemini', awaiting: false };
+        }
+        const count = Number(draft.followUpCount) || 0;
+        if (count >= 1) {
+          return {
+            ...parsed, intent: 'report_issue',
+            draft: { ...mergedDraft, location: 'Not specified', followUpCount: count + 1 },
+            parsedBy: 'gemini', awaiting: false,
+          };
+        }
+        return {
+          ...parsed, intent: 'report_issue',
+          draft: { ...mergedDraft, followUpCount: count + 1 },
+          parsedBy: 'gemini', awaiting: true,
+          reply: 'Where is this happening? Please tell me the block or area.',
+        };
       }
-      return { ...parsed, parsedBy: 'gemini' };
+      if (parsed.intent === 'report_issue' && parsed.draft.summary && !parsed.draft.location) {
+        return {
+          ...parsed, draft: { ...parsed.draft, followUpCount: 0 },
+          parsedBy: 'gemini', awaiting: true,
+          reply: 'Where is this happening? Please tell me the block or area.',
+        };
+      }
+      return { ...parsed, draft: { ...draft, ...parsed.draft }, parsedBy: 'gemini' };
     } catch (error) {
       console.warn('[llm] ' + model + ' unavailable: ' + error.message);
     }
