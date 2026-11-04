@@ -20,15 +20,7 @@ let memStore = new MemoryStore();
 export function resetMemStore() { memStore = new MemoryStore(); }
 
 async function connectMongo() {
-  if (globalThis.__campusVoiceMongoClient) {
-    try {
-      await globalThis.__campusVoiceMongoClient.db('admin').command({ ping: 1 });
-      return globalThis.__campusVoiceMongoClient;
-    } catch {
-      globalThis.__campusVoiceMongoClient = null;
-      globalThis.__campusVoiceMongoPromise = null;
-    }
-  }
+  if (globalThis.__campusVoiceMongoClient) return globalThis.__campusVoiceMongoClient;
   if (!globalThis.__campusVoiceMongoPromise) {
     globalThis.__campusVoiceMongoPromise = (async () => {
       const client = new MongoClient(config.mongoUri, {
