@@ -37,7 +37,7 @@ export function parseModelOutput(raw, model = '') {
   const rawNumber = normalized.ticketNumber;
   const number = typeof rawNumber === 'number' && Number.isSafeInteger(rawNumber)
     ? rawNumber
-    : typeof rawNumber === 'string' && /^\\d+$/.test(rawNumber) ? Number(rawNumber) : null;
+    : typeof rawNumber === 'string' && /^\d+$/.test(rawNumber) ? Number(rawNumber) : null;
   return { intent: normalized.intent, draft, ticketNumber: Number.isSafeInteger(number) && number > 0 ? number : null };
 }
 
@@ -46,7 +46,7 @@ export function parseOutput(raw, gemma = false) {
 }
 
 function isStatusOrCancel(text) {
-  return /^\s*(?:cancel|stop|abort|quit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i.test(text) ||
+  return /^\s*(?:cancel(?:\s+(?:this|that|it|the complaint))?|stop(?:\s+(?:this|that|the complaint))?|abort|quit|never\s+mind|nevermind|forget\s+it)\s*[.!]*$/i.test(text) ||
     /\b(?:status|track|check)\b.*\bticket\b/i.test(text) ||
     /\bticket\s+(?:number\s+)?\d+\b/i.test(text);
 }
